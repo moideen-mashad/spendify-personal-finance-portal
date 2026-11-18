@@ -169,6 +169,24 @@ small {
   z-index: 30;
   transition: width 0.2s;
 }
+.sidebar nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--border) transparent;
+  scrollbar-width: thin;
+}
+.sidebar nav::-webkit-scrollbar {
+  width: 5px;
+}
+.sidebar nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar nav::-webkit-scrollbar-thumb {
+  border-radius: 5px;
+  background: var(--border);
+}
 .brand {
   display: flex;
   align-items: center;
@@ -218,29 +236,12 @@ small {
   background: var(--hover);
 }
 .sidebar-bottom {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   margin-top: auto;
   padding-top: 30px;
-}
-.sidebar-note {
-  border: 1px solid var(--border);
-  background: var(--bg);
-  padding: 16px;
-  border-radius: 9px;
-  margin: 0 0 24px;
-}
-.sidebar-note b {
-  display: block;
-  font-size: 11px;
-  margin: 12px 0 8px;
-}
-.sidebar-note p {
-  font-size: 11px;
-  line-height: 1.8;
-  color: var(--muted);
-}
-.note-icon {
-  font-size: 25px;
-  color: #8796a9;
+  background: var(--panel);
 }
 .user-block {
   border-top: 1px solid var(--border);
@@ -1137,6 +1138,75 @@ label select {
 .transaction-cards {
   display: none;
 }
+.table-view-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.transaction-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 14px;
+  padding: 0 24px 24px;
+}
+.transaction-grid-card {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.transaction-grid-card[data-selected="true"] {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+.transaction-grid-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.transaction-grid-category-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+}
+.transaction-type-pill {
+  margin-left: auto;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: var(--hover);
+  font-size: 9px;
+}
+.transaction-grid-main {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  text-align: left;
+}
+.transaction-grid-main > span {
+  min-width: 0;
+}
+.transaction-grid-main b {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.transaction-grid-main small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.transaction-grid-main > b {
+  flex: 0 0 auto;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 .budget-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1148,6 +1218,104 @@ label select {
   justify-content: space-between;
   margin-bottom: 30px;
   color: var(--muted);
+}
+.recurring-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 14px;
+  padding: 20px;
+}
+.recurring-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.recurring-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.recurring-type-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--hover);
+}
+.recurring-type-icon.income {
+  background: #08795515;
+}
+.recurring-type-icon.expense {
+  background: #bd354f15;
+}
+.recurring-card-title {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+.recurring-card-title b {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.recurring-card-title small,
+.recurring-card-details small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.recurring-card-heading .pill {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.recurring-card-heading .pill.income {
+  border-color: transparent;
+  background: #08795515;
+}
+.recurring-card-heading .pill.subtle {
+  background: var(--hover);
+}
+.recurring-card-amount {
+  margin: 18px 0;
+  font-size: 18px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.recurring-card-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 12px 0;
+  border-block: 1px solid var(--border);
+}
+.recurring-card-details span,
+.recurring-card-details b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.recurring-card-details span {
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+.recurring-card-details b {
+  font-size: 10px;
+  font-weight: 550;
+  text-transform: capitalize;
+}
+.recurring-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 14px;
+}
+.recurring-card-actions .button {
+  padding: 5px 9px;
+  font-size: 11px;
 }
 .info-banner {
   display: flex;
@@ -1166,6 +1334,146 @@ label select {
 }
 .settings-panel {
   max-width: 780px;
+}
+.category-section-heading,
+.category-section-actions {
+  display: flex;
+  align-items: center;
+}
+.category-section-heading {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.category-section-actions {
+  gap: 10px;
+}
+.view-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.view-toggle button {
+  display: grid;
+  width: 32px;
+  height: 30px;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--muted);
+}
+.view-toggle button.selected {
+  background: var(--hover);
+  color: var(--text);
+}
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.category-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 18px;
+}
+.category-card-details,
+.category-table-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.category-card-details > div {
+  min-width: 0;
+}
+.category-card-details b {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.category-icon-badge {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 10px;
+}
+.category-row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.category-table-wrap {
+  overflow-x: auto;
+}
+.category-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+}
+.category-table th,
+.category-table td {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.category-table th {
+  background: var(--hover);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.category-table td {
+  font-size: 12px;
+}
+.category-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.category-actions-heading,
+.category-table td:last-child {
+  text-align: right;
+}
+.category-table-name b {
+  overflow-wrap: anywhere;
+}
+.category-type-label {
+  color: var(--muted);
+}
+.budget-category-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+}
+.budget-table .numeric-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.budget-table-usage {
+  display: flex;
+  min-width: 150px;
+  align-items: center;
+  gap: 8px;
+}
+.budget-table-usage .progress-track {
+  flex: 1;
+  min-width: 80px;
+  margin: 0;
+}
+.budget-table-usage > b {
+  min-width: 36px;
+  text-align: right;
+  font-size: 10px;
 }
 .settings-row {
   display: flex;
@@ -1343,6 +1651,15 @@ mark {
   }
   .page-heading .heading-actions {
     width: 100%;
+    flex-wrap: wrap;
+  }
+  .category-section-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .category-section-actions {
+    width: 100%;
+    justify-content: space-between;
   }
   .kpi-grid {
     gap: 10px;
@@ -1424,6 +1741,19 @@ mark {
   }
   .table-meta {
     padding: 14px 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .table-view-actions {
+    margin-left: auto;
+  }
+  .transaction-grid {
+    grid-template-columns: 1fr;
+    padding: 0 16px 16px;
+  }
+  .recurring-grid {
+    grid-template-columns: 1fr;
+    padding: 16px;
   }
   .pagination {
     padding: 16px;

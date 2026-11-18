@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Plus, Edit2, Trash2 } from "lucide-react";
+import { Plus, Edit2, Trash2, LayoutGrid, Table } from "lucide-react";
+import axios from "axios";
 import { toast } from "sonner";
 import api from "../api/client";
 import { useFinance } from "../hooks/useFinance";
@@ -11,6 +12,7 @@ import {
 import { Dialog } from "../components/ui/dialog";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { ErrorState, Skeleton } from "../components/Feedback";
+import { usePersistentView } from "../hooks/usePersistentView";
 
 const PALETTE = [
   "#EF4444", // Red
@@ -27,6 +29,137 @@ const PALETTE = [
   "#84CC16", // Lime
 ];
 
+type CategoryView = "grid" | "table";
+
+function CategoryList({
+  categories,
+  type,
+  view,
+  onEdit,
+  onDelete,
+}: {
+  categories: Category[];
+  type: Category["type"];
+  view: CategoryView;
+  onEdit: (category: Category) => void;
+  onDelete: (category: Category) => void;
+}) {
+  if (view === "table") {
+    return (
+      <div className="panel category-table-wrap">
+        <table className="category-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Type</th>
+              <th className="category-actions-heading">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.map((category) => {
+              const IconComponent = getCategoryIcon(category.icon);
+              return (
+                <tr key={category.id}>
+                  <td>
+                    <div className="category-table-name">
+                      <span
+                        className="category-icon-badge"
+                        style={{
+                          background: `${category.color}18`,
+                          color: category.color,
+                        }}
+                      >
+                        <IconComponent size={18} />
+                      </span>
+                      <b>{category.name}</b>
+                    </div>
+                  </td>
+                  <td>
+                    <span className="category-type-label">
+                      {type === "expense" ? "Expense" : "Income"}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="category-row-actions">
+                      <button
+                        type="button"
+                        className="icon-button"
+                        onClick={() => onEdit(category)}
+                        title="Edit category"
+                        aria-label={`Edit ${category.name}`}
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        onClick={() => onDelete(category)}
+                        title="Delete category"
+                        aria-label={`Delete ${category.name}`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <div className="category-grid">
+      {categories.map((category) => {
+        const IconComponent = getCategoryIcon(category.icon);
+        return (
+          <div key={category.id} className="panel category-card">
+            <div className="category-card-details">
+              <span
+                className="category-icon-badge"
+                style={{
+                  background: `${category.color}18`,
+                  color: category.color,
+                }}
+              >
+                <IconComponent size={19} />
+              </span>
+              <div>
+                <b>{category.name}</b>
+                <small className="subtle">
+                  {type === "expense" ? "Expense" : "Income"}
+                </small>
+              </div>
+            </div>
+            <div className="category-row-actions">
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => onEdit(category)}
+                title="Edit category"
+                aria-label={`Edit ${category.name}`}
+              >
+                <Edit2 size={14} />
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => onDelete(category)}
+                title="Delete category"
+                aria-label={`Delete ${category.name}`}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function CategoriesPage() {
   const {
     data: categories,
@@ -39,6 +172,7 @@ export default function CategoriesPage() {
   const [busy, setBusy] = useState(false);
   const [deletingCat, setDeletingCat] = useState<Category | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [view, setView] = usePersistentView("spendify:view:categories", "grid");
 
   // Form state
   const [name, setName] = useState("");
@@ -70,6 +204,16 @@ export default function CategoriesPage() {
       toast.error("Please enter a category name");
       return;
     }
+    const duplicate = (categories || []).some(
+      (category) =>
+        category.id !== editing?.id &&
+        category.type === type &&
+        category.name.trim().toLowerCase() === name.trim().toLowerCase(),
+    );
+    if (duplicate) {
+      toast.error("A category with this name and type already exists.");
+      return;
+    }
 
     setBusy(true);
     try {
@@ -94,8 +238,12 @@ export default function CategoriesPage() {
       toast.success(editing ? "Category updated" : "Category created");
       setOpen(false);
       reload();
-    } catch {
-      toast.error("Could not save category. Name may already exist.");
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        toast.error("A category with this name and type already exists.");
+      } else {
+        toast.error("Could not save category. Please try again.");
+      }
     } finally {
       setBusy(false);
     }
@@ -153,14 +301,7 @@ export default function CategoriesPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
           {/* Expense Categories */}
           <section>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 14,
-              }}
-            >
+            <div className="category-section-heading">
               <div>
                 <h2 style={{ fontSize: 16, fontWeight: 600 }}>
                   Expense Categories
@@ -169,93 +310,53 @@ export default function CategoriesPage() {
                   Outflows, bills, shopping, lifestyle
                 </small>
               </div>
-              <button
-                type="button"
-                className="button secondary"
-                onClick={() => openCreate("expense")}
-              >
-                <Plus size={14} /> Add Expense Category
-              </button>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                gap: 14,
-              }}
-            >
-              {expenseCategories.map((cat) => {
-                const IconComponent = getCategoryIcon(cat.icon);
-                return (
-                  <div
-                    key={cat.id}
-                    className="panel"
-                    style={{
-                      padding: "16px 18px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
+              <div className="category-section-actions">
+                <div
+                  className="view-toggle"
+                  role="group"
+                  aria-label="Category view"
+                >
+                  <button
+                    type="button"
+                    className={view === "grid" ? "selected" : ""}
+                    aria-label="Grid view"
+                    aria-pressed={view === "grid"}
+                    onClick={() => setView("grid")}
                   >
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 12 }}
-                    >
-                      <div
-                        style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: 10,
-                          background: `${cat.color}18`,
-                          color: cat.color,
-                          display: "grid",
-                          placeItems: "center",
-                        }}
-                      >
-                        <IconComponent size={19} />
-                      </div>
-                      <div>
-                        <b style={{ display: "block", fontSize: 13 }}>
-                          {cat.name}
-                        </b>
-                        <small className="subtle">Expense</small>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        onClick={() => openEdit(cat)}
-                        title="Edit category"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        onClick={() => setDeletingCat(cat)}
-                        title="Delete category"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                    <LayoutGrid size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className={view === "table" ? "selected" : ""}
+                    aria-label="Table view"
+                    aria-pressed={view === "table"}
+                    onClick={() => setView("table")}
+                  >
+                    <Table size={16} />
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => openCreate("expense")}
+                >
+                  <Plus size={14} /> Add Expense Category
+                </button>
+              </div>
             </div>
+
+            <CategoryList
+              categories={expenseCategories}
+              type="expense"
+              view={view}
+              onEdit={openEdit}
+              onDelete={setDeletingCat}
+            />
           </section>
 
           {/* Income Categories */}
           <section>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 14,
-              }}
-            >
+            <div className="category-section-heading">
               <div>
                 <h2 style={{ fontSize: 16, fontWeight: 600 }}>
                   Income Categories
@@ -273,72 +374,13 @@ export default function CategoriesPage() {
               </button>
             </div>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                gap: 14,
-              }}
-            >
-              {incomeCategories.map((cat) => {
-                const IconComponent = getCategoryIcon(cat.icon);
-                return (
-                  <div
-                    key={cat.id}
-                    className="panel"
-                    style={{
-                      padding: "16px 18px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 12 }}
-                    >
-                      <div
-                        style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: 10,
-                          background: `${cat.color}18`,
-                          color: cat.color,
-                          display: "grid",
-                          placeItems: "center",
-                        }}
-                      >
-                        <IconComponent size={19} />
-                      </div>
-                      <div>
-                        <b style={{ display: "block", fontSize: 13 }}>
-                          {cat.name}
-                        </b>
-                        <small className="subtle">Income</small>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        onClick={() => openEdit(cat)}
-                        title="Edit category"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        onClick={() => setDeletingCat(cat)}
-                        title="Delete category"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <CategoryList
+              categories={incomeCategories}
+              type="income"
+              view={view}
+              onEdit={openEdit}
+              onDelete={setDeletingCat}
+            />
           </section>
         </div>
       )}

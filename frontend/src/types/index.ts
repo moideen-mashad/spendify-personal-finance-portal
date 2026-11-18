@@ -51,9 +51,10 @@ export type RecurringTransaction = {
   amount: number;
   frequency: "daily" | "weekly" | "monthly" | "yearly";
   nextRunDate: string;
+  lastRunAt?: string;
   isActive: boolean;
   categoryId: number;
-  categoryName?: string;
+  category: Category;
 };
 
 export type SavingsGoal = {

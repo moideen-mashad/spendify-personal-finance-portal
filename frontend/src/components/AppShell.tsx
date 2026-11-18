@@ -86,17 +86,6 @@ export default function AppShell() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          {!collapsed && (
-            <div className="sidebar-note">
-              <span className="note-icon">↗</span>
-              <b>Small steps. Big picture.</b>
-              <p>
-                A little attention today.
-                <br />
-                More confidence tomorrow.
-              </p>
-            </div>
-          )}
           <NavLink className="nav" to="/profile">
             <Settings size={19} />
             {!collapsed && "Settings"}

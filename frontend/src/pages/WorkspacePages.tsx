@@ -1,7 +1,20 @@
 import { useState, useEffect } from "react";
 import { MonthPicker } from "../components/ui/date-picker";
 import { Link } from "react-router-dom";
-import { Plus, Wallet, ShieldCheck, ArrowUpRight, User, Settings2, Lock, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import {
+  Plus,
+  Wallet,
+  ShieldCheck,
+  ArrowUpRight,
+  User,
+  Settings2,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  LayoutGrid,
+  Table,
+} from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { Select } from "../components/ui/select";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,6 +22,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { useFinance } from "../hooks/useFinance";
+import { usePersistentView } from "../hooks/usePersistentView";
 import { useAuth } from "../context/AuthContext";
 import type { BudgetActual } from "../types/finance";
 import type { Category, AuditLog } from "../types";
@@ -16,6 +30,7 @@ import { BudgetProgress } from "../components/dashboard/BudgetProgress";
 import { Dialog } from "../components/ui/dialog";
 import { EmptyState, ErrorState, Skeleton } from "../components/Feedback";
 import api from "../api/client";
+import { money } from "../utils/format";
 
 // ─────────────────────────── BudgetsPage ───────────────────────────
 const budgetSchema = z.object({
@@ -33,9 +48,12 @@ export function BudgetsPage() {
   const { data, loading, error, reload } = useFinance<BudgetActual[]>(
     `/reports/budget-vs-actual?month=${m}&year=${y}`,
   );
-  const { data: categories } = useFinance<Category[]>("/categories?type=expense");
+  const { data: categories } = useFinance<Category[]>(
+    "/categories?type=expense",
+  );
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<BudgetActual>();
+  const [view, setView] = usePersistentView("spendify:view:budgets", "grid");
   const {
     register,
     control,
@@ -45,6 +63,15 @@ export function BudgetsPage() {
   } = useForm<z.infer<typeof budgetSchema>>({
     resolver: zodResolver(budgetSchema),
   });
+  const openBudgetEditor = (budget?: BudgetActual) => {
+    setEditing(budget);
+    reset(
+      budget
+        ? { categoryId: budget.categoryId, amountLimit: budget.limit }
+        : { categoryId: 0, amountLimit: 0 },
+    );
+    setOpen(true);
+  };
   return (
     <>
       <div className="page-heading">
@@ -56,20 +83,33 @@ export function BudgetsPage() {
           <p>A plan for your money. Room for your life.</p>
         </div>
         <div className="heading-actions">
+          <div className="view-toggle" role="group" aria-label="Budget view">
+            <button
+              type="button"
+              className={view === "grid" ? "selected" : ""}
+              aria-label="Grid view"
+              aria-pressed={view === "grid"}
+              onClick={() => setView("grid")}
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              type="button"
+              className={view === "table" ? "selected" : ""}
+              aria-label="Table view"
+              aria-pressed={view === "table"}
+              onClick={() => setView("table")}
+            >
+              <Table size={16} />
+            </button>
+          </div>
           <MonthPicker
             label="Budget month"
             value={month}
             onValueChange={setMonth}
             className="month-control"
           />
-          <button
-            className="button primary"
-            onClick={() => {
-              setEditing(undefined);
-              reset({ categoryId: 0, amountLimit: 0 });
-              setOpen(true);
-            }}
-          >
+          <button className="button primary" onClick={() => openBudgetEditor()}>
             <Plus size={16} />
             Add budget
           </button>
@@ -92,14 +132,10 @@ export function BudgetsPage() {
             title="Give your money a direction"
             description="Create your first monthly budget to stay on track."
             action="Create a budget"
-            onAction={() => {
-              setEditing(undefined);
-              reset({ categoryId: 0, amountLimit: 0 });
-              setOpen(true);
-            }}
+            onAction={() => openBudgetEditor()}
           />
         </div>
-      ) : (
+      ) : view === "grid" ? (
         <div className="budget-grid">
           {data.map((b) => (
             <section className="panel panel-body" key={b.budgetId}>
@@ -107,11 +143,7 @@ export function BudgetsPage() {
                 <Wallet size={22} />
                 <button
                   className="text-button"
-                  onClick={() => {
-                    setEditing(b);
-                    reset({ categoryId: b.categoryId, amountLimit: b.limit });
-                    setOpen(true);
-                  }}
+                  onClick={() => openBudgetEditor(b)}
                 >
                   Edit budget <ArrowUpRight size={14} />
                 </button>
@@ -119,6 +151,83 @@ export function BudgetsPage() {
               <BudgetProgress budget={b} currency={user?.currency} />
             </section>
           ))}
+        </div>
+      ) : (
+        <div className="panel category-table-wrap">
+          <table className="category-table budget-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th className="numeric-cell">Spent</th>
+                <th className="numeric-cell">Budget</th>
+                <th className="numeric-cell">Remaining</th>
+                <th>Usage</th>
+                <th className="category-actions-heading">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((budget) => {
+                const percent = Number(budget.utilisationPercent);
+                const tone =
+                  percent >= 100
+                    ? "expense"
+                    : percent >= 80
+                      ? "warning"
+                      : "income";
+                return (
+                  <tr key={budget.budgetId}>
+                    <td>
+                      <div className="category-table-name">
+                        <span className="budget-category-icon">
+                          <Wallet size={16} />
+                        </span>
+                        <b>{budget.categoryName}</b>
+                      </div>
+                    </td>
+                    <td className="numeric-cell">
+                      {money(budget.spent, user?.currency)}
+                    </td>
+                    <td className="numeric-cell">
+                      {money(budget.limit, user?.currency)}
+                    </td>
+                    <td
+                      className={`numeric-cell ${budget.remaining < 0 ? "expense" : "income"}`}
+                    >
+                      {budget.remaining < 0
+                        ? `-${money(Math.abs(budget.remaining), user?.currency)}`
+                        : money(budget.remaining, user?.currency)}
+                    </td>
+                    <td>
+                      <div className="budget-table-usage">
+                        <div
+                          className="progress-track"
+                          role="progressbar"
+                          aria-label={`${budget.categoryName} budget usage`}
+                          aria-valuenow={Math.min(percent, 100)}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                        >
+                          <div
+                            className={`fill ${tone}`}
+                            style={{ width: `${Math.min(percent, 100)}%` }}
+                          />
+                        </div>
+                        <b className={tone}>{percent.toFixed(0)}%</b>
+                      </div>
+                    </td>
+                    <td className="category-actions-heading">
+                      <button
+                        className="text-button"
+                        onClick={() => openBudgetEditor(budget)}
+                      >
+                        Edit budget <ArrowUpRight size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
       <Dialog
@@ -267,7 +376,11 @@ const passwordSchema = z
     message: "Passwords do not match",
   });
 
-function getPasswordStrength(pw: string): { label: string; color: string; pct: number } {
+function getPasswordStrength(pw: string): {
+  label: string;
+  color: string;
+  pct: number;
+} {
   if (!pw) return { label: "", color: "var(--border)", pct: 0 };
   let score = 0;
   if (pw.length >= 8) score++;
@@ -282,7 +395,9 @@ function getPasswordStrength(pw: string): { label: string; color: string; pct: n
 
 export function SettingsPage() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState<"profile" | "financial" | "security">("profile");
+  const [tab, setTab] = useState<"profile" | "financial" | "security">(
+    "profile",
+  );
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -336,12 +451,13 @@ export function SettingsPage() {
     }
   }, [user]);
 
-  const initials = user?.fullName
-    .split(" ")
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase() ?? "?";
+  const initials =
+    user?.fullName
+      .split(" ")
+      .slice(0, 2)
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase() ?? "?";
 
   return (
     <>
@@ -357,7 +473,9 @@ export function SettingsPage() {
 
       <section className="panel settings-panel">
         {/* Tab bar */}
-        <div style={{ display: "flex", borderBottom: "1px solid var(--border)" }}>
+        <div
+          style={{ display: "flex", borderBottom: "1px solid var(--border)" }}
+        >
           {(
             [
               { key: "profile", label: "Profile", icon: User },
@@ -375,7 +493,10 @@ export function SettingsPage() {
                 padding: "16px 24px",
                 fontSize: 12,
                 fontWeight: 550,
-                borderBottom: tab === key ? "2px solid var(--text)" : "2px solid transparent",
+                borderBottom:
+                  tab === key
+                    ? "2px solid var(--text)"
+                    : "2px solid transparent",
                 color: tab === key ? "var(--text)" : "var(--muted)",
                 borderRadius: 0,
                 marginBottom: -1,
@@ -402,7 +523,14 @@ export function SettingsPage() {
             })}
           >
             {/* Avatar */}
-            <div style={{ display: "flex", alignItems: "center", gap: 20, padding: "8px 0" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 20,
+                padding: "8px 0",
+              }}
+            >
               <div
                 style={{
                   width: 64,
@@ -425,7 +553,11 @@ export function SettingsPage() {
                   <img
                     src={user.avatarUrl}
                     alt="Avatar"
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
                   />
                 ) : (
                   initials
@@ -433,27 +565,45 @@ export function SettingsPage() {
               </div>
               <div>
                 <b style={{ fontSize: 13 }}>{user?.fullName}</b>
-                <p style={{ color: "var(--muted)", fontSize: 11, marginTop: 4 }}>
+                <p
+                  style={{ color: "var(--muted)", fontSize: 11, marginTop: 4 }}
+                >
                   Click the avatar to update your photo
                 </p>
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+              }}
+            >
               <label>
                 Full Name
                 <input {...profileForm.register("fullName")} />
                 {profileForm.formState.errors.fullName && (
-                  <span className="field-error">{profileForm.formState.errors.fullName.message}</span>
+                  <span className="field-error">
+                    {profileForm.formState.errors.fullName.message}
+                  </span>
                 )}
               </label>
               <label>
                 Email address
-                <input value={user?.email ?? ""} readOnly style={{ opacity: 0.6 }} />
+                <input
+                  value={user?.email ?? ""}
+                  readOnly
+                  style={{ opacity: 0.6 }}
+                />
               </label>
               <label>
                 Phone
-                <input type="tel" {...profileForm.register("phone")} placeholder="+91 98765 43210" />
+                <input
+                  type="tel"
+                  {...profileForm.register("phone")}
+                  placeholder="+91 98765 43210"
+                />
               </label>
               <label>
                 Preferred Currency
@@ -506,7 +656,9 @@ export function SettingsPage() {
                 className="button primary"
                 disabled={profileForm.formState.isSubmitting}
               >
-                {profileForm.formState.isSubmitting ? "Saving…" : "Save profile"}
+                {profileForm.formState.isSubmitting
+                  ? "Saving…"
+                  : "Save profile"}
               </button>
             </div>
           </form>
@@ -536,7 +688,10 @@ export function SettingsPage() {
                   </option>
                 ))}
               </select>
-              <span className="field-error" style={{ color: "var(--muted)", fontWeight: 400 }}>
+              <span
+                className="field-error"
+                style={{ color: "var(--muted)", fontWeight: 400 }}
+              >
                 Your month will start on this day each month.
               </span>
             </label>
@@ -556,7 +711,14 @@ export function SettingsPage() {
               <select disabled>
                 <option>System default ({user?.currency})</option>
               </select>
-              <span style={{ color: "var(--muted)", fontSize: 11, display: "block", marginTop: 6 }}>
+              <span
+                style={{
+                  color: "var(--muted)",
+                  fontSize: 11,
+                  display: "block",
+                  marginTop: 6,
+                }}
+              >
                 Formatting follows your preferred currency setting.
               </span>
             </label>
@@ -567,7 +729,9 @@ export function SettingsPage() {
                 className="button primary"
                 disabled={financialForm.formState.isSubmitting}
               >
-                {financialForm.formState.isSubmitting ? "Saving…" : "Save financial settings"}
+                {financialForm.formState.isSubmitting
+                  ? "Saving…"
+                  : "Save financial settings"}
               </button>
             </div>
           </form>
@@ -575,7 +739,10 @@ export function SettingsPage() {
 
         {/* ── Security Tab ── */}
         {tab === "security" && (
-          <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+          <div
+            className="panel-body"
+            style={{ display: "flex", flexDirection: "column", gap: 28 }}
+          >
             {/* Change Password */}
             <div>
               <h2 style={{ marginBottom: 16 }}>Change password</h2>
@@ -590,7 +757,9 @@ export function SettingsPage() {
                     toast.success("Password changed successfully");
                     passwordForm.reset();
                   } catch (e: any) {
-                    toast.error(e?.response?.data?.error || "Could not change password");
+                    toast.error(
+                      e?.response?.data?.error || "Could not change password",
+                    );
                   }
                 })}
               >
@@ -605,14 +774,21 @@ export function SettingsPage() {
                     <button
                       type="button"
                       className="icon-button"
-                      style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)" }}
+                      style={{
+                        position: "absolute",
+                        right: 6,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                      }}
                       onClick={() => setShowCurrent((v) => !v)}
                     >
                       {showCurrent ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
                   {passwordForm.formState.errors.currentPassword && (
-                    <span className="field-error">{passwordForm.formState.errors.currentPassword.message}</span>
+                    <span className="field-error">
+                      {passwordForm.formState.errors.currentPassword.message}
+                    </span>
                   )}
                 </label>
 
@@ -627,7 +803,12 @@ export function SettingsPage() {
                     <button
                       type="button"
                       className="icon-button"
-                      style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)" }}
+                      style={{
+                        position: "absolute",
+                        right: 6,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                      }}
                       onClick={() => setShowNew((v) => !v)}
                     >
                       {showNew ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -654,13 +835,22 @@ export function SettingsPage() {
                           }}
                         />
                       </div>
-                      <span style={{ fontSize: 10, color: strength.color, marginTop: 4, display: "block" }}>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: strength.color,
+                          marginTop: 4,
+                          display: "block",
+                        }}
+                      >
                         {strength.label}
                       </span>
                     </div>
                   )}
                   {passwordForm.formState.errors.newPassword && (
-                    <span className="field-error">{passwordForm.formState.errors.newPassword.message}</span>
+                    <span className="field-error">
+                      {passwordForm.formState.errors.newPassword.message}
+                    </span>
                   )}
                 </label>
 
@@ -675,14 +865,21 @@ export function SettingsPage() {
                     <button
                       type="button"
                       className="icon-button"
-                      style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)" }}
+                      style={{
+                        position: "absolute",
+                        right: 6,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                      }}
                       onClick={() => setShowConfirm((v) => !v)}
                     >
                       {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
                   {passwordForm.formState.errors.confirmPassword && (
-                    <span className="field-error">{passwordForm.formState.errors.confirmPassword.message}</span>
+                    <span className="field-error">
+                      {passwordForm.formState.errors.confirmPassword.message}
+                    </span>
                   )}
                 </label>
 
@@ -692,7 +889,9 @@ export function SettingsPage() {
                     className="button primary"
                     disabled={passwordForm.formState.isSubmitting}
                   >
-                    {passwordForm.formState.isSubmitting ? "Updating…" : "Update password"}
+                    {passwordForm.formState.isSubmitting
+                      ? "Updating…"
+                      : "Update password"}
                   </button>
                 </div>
               </form>
@@ -704,19 +903,31 @@ export function SettingsPage() {
               {auditLogs && auditLogs.length > 0 ? (
                 <div className="panel" style={{ overflow: "hidden" }}>
                   {auditLogs.slice(0, 5).map((log) => (
-                    <div key={log.id} className="settings-row" style={{ fontSize: 11 }}>
+                    <div
+                      key={log.id}
+                      className="settings-row"
+                      style={{ fontSize: 11 }}
+                    >
                       <span style={{ color: "var(--muted)" }}>
                         {new Date(log.createdAt).toLocaleString()}
                       </span>
                       <b style={{ fontWeight: 550 }}>{log.action}</b>
-                      <span style={{ color: "var(--muted)", fontFamily: "monospace", fontSize: 10 }}>
+                      <span
+                        style={{
+                          color: "var(--muted)",
+                          fontFamily: "monospace",
+                          fontSize: 10,
+                        }}
+                      >
                         {log.ipAddress}
                       </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p style={{ color: "var(--muted)", fontSize: 12 }}>No recent activity recorded.</p>
+                <p style={{ color: "var(--muted)", fontSize: 12 }}>
+                  No recent activity recorded.
+                </p>
               )}
             </div>
 
@@ -726,9 +937,12 @@ export function SettingsPage() {
                 className="button secondary"
                 onClick={async () => {
                   try {
-                    const r = await api.get("/transactions/export?format=xlsx", {
-                      responseType: "blob",
-                    });
+                    const r = await api.get(
+                      "/transactions/export?format=xlsx",
+                      {
+                        responseType: "blob",
+                      },
+                    );
                     const url = URL.createObjectURL(r.data as Blob);
                     const a = document.createElement("a");
                     a.href = url;
@@ -755,21 +969,43 @@ export function SettingsPage() {
                 marginTop: 8,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  marginBottom: 12,
+                }}
+              >
                 <AlertTriangle size={16} style={{ color: "var(--expense)" }} />
                 <h2 style={{ color: "var(--expense)" }}>Danger zone</h2>
               </div>
-              <p style={{ color: "var(--muted)", fontSize: 12, marginBottom: 16 }}>
-                Permanently delete your account and all associated data. This cannot be undone.
+              <p
+                style={{
+                  color: "var(--muted)",
+                  fontSize: 12,
+                  marginBottom: 16,
+                }}
+              >
+                Permanently delete your account and all associated data. This
+                cannot be undone.
               </p>
-              <button className="button danger" onClick={() => setDeleteOpen(true)}>
+              <button
+                className="button danger"
+                onClick={() => setDeleteOpen(true)}
+              >
                 Delete my account
               </button>
             </div>
 
             {/* Sign out */}
-            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 20 }}>
-              <button className="button secondary" onClick={() => void logout()}>
+            <div
+              style={{ borderTop: "1px solid var(--border)", paddingTop: 20 }}
+            >
+              <button
+                className="button secondary"
+                onClick={() => void logout()}
+              >
                 Sign out of workspace
               </button>
             </div>
@@ -789,7 +1025,10 @@ export function SettingsPage() {
             ⚠ This action is irreversible.
           </p>
           <div className="dialog-actions">
-            <button className="button secondary" onClick={() => setDeleteOpen(false)}>
+            <button
+              className="button secondary"
+              onClick={() => setDeleteOpen(false)}
+            >
               Cancel
             </button>
             <button
@@ -799,7 +1038,9 @@ export function SettingsPage() {
                   await api.delete("/users/me");
                   void logout();
                 } catch {
-                  toast.error("Could not delete account. Please contact support.");
+                  toast.error(
+                    "Could not delete account. Please contact support.",
+                  );
                 }
               }}
             >

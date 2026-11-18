@@ -16,6 +16,8 @@ import {
   ChevronRight,
   Download,
   Trash2,
+  LayoutGrid,
+  Table,
 } from "lucide-react";
 import type { Transaction } from "../../types";
 import { money, date } from "../../utils/format";
@@ -64,6 +66,8 @@ function Highlight({ text, q }: { text: string; q: string }) {
 export function TransactionsDataTable({
   rows,
   currency,
+  view,
+  onViewChange,
   q = "",
   onEdit,
   onDelete,
@@ -78,6 +82,8 @@ export function TransactionsDataTable({
 }: {
   rows: Transaction[];
   currency?: string;
+  view: "grid" | "table";
+  onViewChange: (view: "grid" | "table") => void;
   q?: string;
   onEdit: (t: Transaction) => void;
   onDelete?: (rows: Transaction[]) => void;
@@ -217,117 +223,247 @@ export function TransactionsDataTable({
     isMultiSortEvent: () => true,
   });
   const selected = table.getSelectedRowModel().rows.map((r) => r.original);
+  const gridSort = sorting[0]
+    ? `${sorting[0].id}:${sorting[0].desc ? "desc" : "asc"}`
+    : "txnDate:desc";
   return (
     <>
       <div className="table-meta">
         <span>
           {rows.length} transactions{" "}
-          <span className="muted">
-            · Click headings to sort; multiple columns supported
-          </span>
+          {view === "table" && (
+            <span className="muted">
+              · Click headings to sort; multiple columns supported
+            </span>
+          )}
         </span>
-        <button className="text-button" onClick={() => setCompact((v) => !v)}>
-          {compact ? "Comfortable" : "Compact"} view
-        </button>
+        <div className="table-view-actions">
+          {view === "grid" && (
+            <Select
+              label="Sort transactions"
+              className="select-compact"
+              value={gridSort}
+              onValueChange={(value) => {
+                const [id, direction] = value.split(":");
+                setSorting([{ id, desc: direction === "desc" }]);
+              }}
+              options={[
+                { value: "txnDate:desc", label: "Newest first" },
+                { value: "txnDate:asc", label: "Oldest first" },
+                { value: "amount:desc", label: "Amount: high to low" },
+                { value: "amount:asc", label: "Amount: low to high" },
+                { value: "description:asc", label: "Description: A–Z" },
+                { value: "description:desc", label: "Description: Z–A" },
+              ]}
+            />
+          )}
+          <div
+            className="view-toggle"
+            role="group"
+            aria-label="Transaction view"
+          >
+            <button
+              type="button"
+              className={view === "grid" ? "selected" : ""}
+              aria-label="Grid view"
+              aria-pressed={view === "grid"}
+              onClick={() => onViewChange("grid")}
+            >
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              type="button"
+              className={view === "table" ? "selected" : ""}
+              aria-label="Table view"
+              aria-pressed={view === "table"}
+              onClick={() => onViewChange("table")}
+            >
+              <Table size={15} />
+            </button>
+          </div>
+          {view === "table" && (
+            <button
+              className="text-button"
+              onClick={() => setCompact((v) => !v)}
+            >
+              {compact ? "Comfortable" : "Compact"} view
+            </button>
+          )}
+        </div>
       </div>
       {rows.length ? (
         <>
-          <div className={"table-scroll " + (compact ? "compact" : "")}>
-            <table className="finance-table">
-              <thead>
-                {table.getHeaderGroups().map((group) => (
-                  <tr key={group.id}>
-                    {group.headers.map((h) => (
-                      <th
-                        key={h.id}
-                        aria-sort={
-                          h.column.getIsSorted() === "asc"
-                            ? "ascending"
-                            : h.column.getIsSorted() === "desc"
-                              ? "descending"
-                              : "none"
+          {view === "table" ? (
+            <>
+              <div className={"table-scroll " + (compact ? "compact" : "")}>
+                <table className="finance-table">
+                  <thead>
+                    {table.getHeaderGroups().map((group) => (
+                      <tr key={group.id}>
+                        {group.headers.map((h) => (
+                          <th
+                            key={h.id}
+                            aria-sort={
+                              h.column.getIsSorted() === "asc"
+                                ? "ascending"
+                                : h.column.getIsSorted() === "desc"
+                                  ? "descending"
+                                  : "none"
+                            }
+                          >
+                            {h.column.getCanSort() ? (
+                              <button
+                                onClick={h.column.getToggleSortingHandler()}
+                              >
+                                {flexRender(
+                                  h.column.columnDef.header,
+                                  h.getContext(),
+                                )}
+                                {h.column.getIsSorted() === "asc" ? (
+                                  <ArrowUp size={13} />
+                                ) : h.column.getIsSorted() === "desc" ? (
+                                  <ArrowDown size={13} />
+                                ) : (
+                                  <ArrowUpDown size={13} />
+                                )}
+                              </button>
+                            ) : (
+                              flexRender(
+                                h.column.columnDef.header,
+                                h.getContext(),
+                              )
+                            )}
+                          </th>
+                        ))}
+                      </tr>
+                    ))}
+                  </thead>
+                  <tbody>
+                    {table.getRowModel().rows.map((row) => (
+                      <tr
+                        key={row.id}
+                        data-selected={row.getIsSelected()}
+                        onClick={(e) => {
+                          if (
+                            !(e.target as HTMLElement).closest("button,input")
+                          )
+                            onEdit(row.original);
+                        }}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <td key={cell.id}>
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="transaction-cards">
+                {table.getRowModel().rows.map((row) => {
+                  const t = row.original;
+                  return (
+                    <div className="mobile-transaction-row" key={t.id}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select mobile ${t.description}`}
+                        checked={row.getIsSelected()}
+                        onChange={row.getToggleSelectedHandler()}
+                      />
+                      <button
+                        className="transaction-card"
+                        onClick={() => onEdit(t)}
+                      >
+                        <span>
+                          <b>{t.description || t.categoryName}</b>
+                          <small>
+                            {t.categoryName} · {date(t.txnDate)}
+                          </small>
+                        </span>
+                        <b
+                          className={
+                            t.categoryType === "income" ? "income" : "expense"
+                          }
+                        >
+                          {t.categoryType === "income" ? "+" : "−"}
+                          {money(t.amount, currency)}
+                        </b>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="transaction-grid" role="list">
+              {table.getRowModel().rows.map((row) => {
+                const t = row.original;
+                const Icon = getCategoryIcon(t.categoryIcon);
+                return (
+                  <article
+                    className="transaction-grid-card"
+                    data-selected={row.getIsSelected()}
+                    key={t.id}
+                    role="listitem"
+                  >
+                    <div className="transaction-grid-top">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${t.description}`}
+                        checked={row.getIsSelected()}
+                        onChange={row.getToggleSelectedHandler()}
+                      />
+                      <span
+                        className="transaction-grid-category-icon"
+                        style={{
+                          color: t.categoryColor,
+                          background: `${t.categoryColor}20`,
+                        }}
+                      >
+                        <Icon size={16} />
+                      </span>
+                      <span
+                        className={
+                          "transaction-type-pill " +
+                          (t.categoryType === "income" ? "income" : "expense")
                         }
                       >
-                        {h.column.getCanSort() ? (
-                          <button onClick={h.column.getToggleSortingHandler()}>
-                            {flexRender(
-                              h.column.columnDef.header,
-                              h.getContext(),
-                            )}
-                            {h.column.getIsSorted() === "asc" ? (
-                              <ArrowUp size={13} />
-                            ) : h.column.getIsSorted() === "desc" ? (
-                              <ArrowDown size={13} />
-                            ) : (
-                              <ArrowUpDown size={13} />
-                            )}
-                          </button>
-                        ) : (
-                          flexRender(h.column.columnDef.header, h.getContext())
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {table.getRowModel().rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    data-selected={row.getIsSelected()}
-                    onClick={(e) => {
-                      if (!(e.target as HTMLElement).closest("button,input"))
-                        onEdit(row.original);
-                    }}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="transaction-cards">
-            {table.getRowModel().rows.map((row) => {
-              const t = row.original;
-              return (
-                <div className="mobile-transaction-row" key={t.id}>
-                  <input
-                    type="checkbox"
-                    aria-label={`Select mobile ${t.description}`}
-                    checked={row.getIsSelected()}
-                    onChange={row.getToggleSelectedHandler()}
-                  />
-                  <button
-                    className="transaction-card"
-                    key={t.id}
-                    onClick={() => onEdit(t)}
-                  >
-                    <span>
-                      <b>{t.description || t.categoryName}</b>
-                      <small>
-                        {t.categoryName} · {date(t.txnDate)}
-                      </small>
-                    </span>
-                    <b
-                      className={
-                        t.categoryType === "income" ? "income" : "expense"
-                      }
+                        {t.categoryType === "income" ? "Income" : "Expense"}
+                      </span>
+                    </div>
+                    <button
+                      className="transaction-grid-main"
+                      onClick={() => onEdit(t)}
                     >
-                      {t.categoryType === "income" ? "+" : "−"}
-                      {money(t.amount, currency)}
-                    </b>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+                      <span>
+                        <b>
+                          <Highlight
+                            text={t.description || t.categoryName}
+                            q={q}
+                          />
+                        </b>
+                        <small>
+                          {t.categoryName} · {date(t.txnDate)}
+                        </small>
+                      </span>
+                      <b
+                        className={
+                          t.categoryType === "income" ? "income" : "expense"
+                        }
+                      >
+                        {t.categoryType === "income" ? "+" : "−"}
+                        {money(t.amount, currency)}
+                      </b>
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
           <div className="pagination">
             <span>
               Page {page} of {Math.max(1, table.getPageCount())}

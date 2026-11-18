@@ -8,6 +8,7 @@ import type { Category, Transaction } from "../types";
 import type { TransactionPage } from "../types/finance";
 import { useAuth } from "../context/AuthContext";
 import { useFinance } from "../hooks/useFinance";
+import { usePersistentView } from "../hooks/usePersistentView";
 import {
   FacetedFilterBar,
   emptyFilters,
@@ -32,6 +33,10 @@ export default function TransactionsPage() {
   const [version, setVersion] = useState(0);
   const [open, setOpen] = useState(false);
   const [excelModalOpen, setExcelModalOpen] = useState(false);
+  const [view, setView] = usePersistentView(
+    "spendify:view:transactions",
+    "table",
+  );
   const [editing, setEditing] = useState<Transaction>();
   const [bulk, setBulk] = useState<{
     kind: "delete" | "category";
@@ -198,6 +203,8 @@ export default function TransactionsPage() {
           <TransactionsDataTable
             rows={filtered}
             currency={user?.currency}
+            view={view}
+            onViewChange={setView}
             q={filters.q}
             onEdit={(t) => {
               setEditing(t);

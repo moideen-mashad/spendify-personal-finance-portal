@@ -67,15 +67,23 @@ export function ExcelImportModal({
     formData.append("file", selectedFile);
 
     try {
-      const res = await api.post<ImportResult>("/transactions/import", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const res = await api.post<ImportResult>(
+        "/transactions/import",
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      );
       setResult(res.data);
       if (res.data.importedRows > 0) {
-        toast.success(`Successfully imported ${res.data.importedRows} transactions`);
+        toast.success(
+          `Successfully imported ${res.data.importedRows} transactions`,
+        );
         onSuccess?.();
       } else {
-        toast.warning("No transactions could be imported. Check the row errors below.");
+        toast.warning(
+          "No transactions could be imported. Check the row errors below.",
+        );
       }
     } catch (err: unknown) {
       const errorMsg =
@@ -152,7 +160,10 @@ export function ExcelImportModal({
           className={activeTab === "import" ? "selected" : ""}
           onClick={() => setActiveTab("import")}
         >
-          <UploadCloud size={14} style={{ display: "inline", marginRight: 6 }} />
+          <UploadCloud
+            size={14}
+            style={{ display: "inline", marginRight: 6 }}
+          />
           Batch Import Wizard
         </button>
         <button
@@ -214,7 +225,9 @@ export function ExcelImportModal({
                     borderRadius: 8,
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 10 }}
+                  >
                     <FileText size={18} color="var(--accent)" />
                     <div>
                       <b style={{ fontSize: 12 }}>{selectedFile.name}</b>
@@ -472,7 +485,8 @@ export function ExcelImportModal({
                 Raw CSV Data Export (.csv)
               </b>
               <small style={{ color: "var(--muted)" }}>
-                Lightweight comma-separated format compatible with any spreadsheet tool.
+                Lightweight comma-separated format compatible with any
+                spreadsheet tool.
               </small>
             </div>
             <button

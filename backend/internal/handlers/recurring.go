@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"strconv"
 	"time"
 
@@ -9,7 +10,35 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+var errRecurringAlreadyPosted = errors.New("schedule already posted for this period")
+
+func recurringAlreadyPosted(rt models.RecurringTransaction, now time.Time) bool {
+	return rt.LastRunAt != nil && now.Before(rt.NextRunDate)
+}
+
+func advanceRecurringDate(date time.Time, frequency string) time.Time {
+	switch frequency {
+	case "daily":
+		return date.AddDate(0, 0, 1)
+	case "weekly":
+		return date.AddDate(0, 0, 7)
+	case "yearly":
+		return date.AddDate(1, 0, 0)
+	default:
+		return date.AddDate(0, 1, 0)
+	}
+}
+
+func nextRecurringDate(date time.Time, frequency string, now time.Time) time.Time {
+	next := advanceRecurringDate(date, frequency)
+	for !next.After(now) {
+		next = advanceRecurringDate(next, frequency)
+	}
+	return next
+}
 
 // ListRecurring handles GET /recurring
 func (h Handler) ListRecurring(c *gin.Context) {
@@ -148,44 +177,44 @@ func (h Handler) RunRecurring(c *gin.Context) {
 	rid, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 	id := uid(c)
 	var rt models.RecurringTransaction
-	if h.DB.Where("id = ? AND user_id = ?", rid, id).First(&rt).Error != nil {
-		c.JSON(404, gin.H{"error": "recurring transaction not found"})
-		return
-	}
-
-	// Create a real transaction
-	txn := models.Transaction{
-		UserID:      id,
-		CategoryID:  rt.CategoryID,
-		Amount:      rt.Amount,
-		Description: "[Auto] " + rt.Title,
-		TxnDate:     time.Now(),
-	}
-
 	var createdTxn models.Transaction
+	now := time.Now()
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND user_id = ?", rid, id).
+			First(&rt).Error; err != nil {
+			return err
+		}
+		if recurringAlreadyPosted(rt, now) {
+			return errRecurringAlreadyPosted
+		}
+
+		txn := models.Transaction{
+			UserID:      id,
+			CategoryID:  rt.CategoryID,
+			Amount:      rt.Amount,
+			Description: "[Auto] " + rt.Title,
+			TxnDate:     now,
+		}
 		if e := tx.Create(&txn).Error; e != nil {
 			return e
 		}
 		createdTxn = txn
-		// Advance next_run_date
-		var next time.Time
-		switch rt.Frequency {
-		case "daily":
-			next = rt.NextRunDate.AddDate(0, 0, 1)
-		case "weekly":
-			next = rt.NextRunDate.AddDate(0, 0, 7)
-		case "monthly":
-			next = rt.NextRunDate.AddDate(0, 1, 0)
-		case "yearly":
-			next = rt.NextRunDate.AddDate(1, 0, 0)
-		default:
-			next = rt.NextRunDate.AddDate(0, 1, 0)
-		}
-		rt.NextRunDate = next
-		return tx.Model(&rt).Update("next_run_date", next).Error
+		rt.NextRunDate = nextRecurringDate(rt.NextRunDate, rt.Frequency, now)
+		rt.LastRunAt = &now
+		return tx.Model(&rt).Updates(map[string]interface{}{
+			"next_run_date": rt.NextRunDate,
+			"last_run_at":   now,
+		}).Error
 	})
-	_ = createdTxn
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(404, gin.H{"error": "recurring transaction not found"})
+		return
+	}
+	if errors.Is(err, errRecurringAlreadyPosted) {
+		c.JSON(409, gin.H{"error": errRecurringAlreadyPosted.Error()})
+		return
+	}
 	if err != nil {
 		c.JSON(500, gin.H{"error": "failed to run recurring transaction"})
 		return
@@ -194,5 +223,6 @@ func (h Handler) RunRecurring(c *gin.Context) {
 		"message":     "recurring transaction executed",
 		"transaction": createdTxn,
 		"nextRunDate": rt.NextRunDate.Format("2006-01-02"),
+		"lastRunAt":   rt.LastRunAt,
 	})
 }

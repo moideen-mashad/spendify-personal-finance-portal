@@ -97,10 +97,11 @@ type RecurringTransaction struct {
 	CategoryID  uint64          `json:"categoryId"`
 	Category    Category        `json:"category"    gorm:"foreignKey:CategoryID"`
 	Title       string          `json:"title"`
-	TxnType     string          `json:"txnType"`    // income | expense
+	TxnType     string          `json:"txnType"` // income | expense
 	Amount      decimal.Decimal `json:"amount"`
-	Frequency   string          `json:"frequency"`  // daily | weekly | monthly | yearly
+	Frequency   string          `json:"frequency"` // daily | weekly | monthly | yearly
 	NextRunDate time.Time       `json:"nextRunDate"`
+	LastRunAt   *time.Time      `json:"lastRunAt,omitempty"`
 	IsActive    bool            `json:"isActive"    gorm:"default:true"`
 	CreatedAt   time.Time       `json:"createdAt"`
 }

@@ -319,6 +319,19 @@ func (h Handler) AuditLogs(c *gin.Context) {
 
 // ─── Category Handlers ────────────────────────────────────────────────────────
 
+func (h Handler) categoryNameExists(userID uint64, name, categoryType string, excludeID uint64) (bool, error) {
+	q := h.DB.Model(&models.Category{}).
+		Where("user_id = ? AND type = ? AND LOWER(name) = ?", userID, categoryType, strings.ToLower(name))
+	if excludeID > 0 {
+		q = q.Where("id <> ?", excludeID)
+	}
+	var count int64
+	if err := q.Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (h Handler) Categories(c *gin.Context) {
 	id := uid(c)
 	if c.Request.Method == "GET" {
@@ -340,6 +353,16 @@ func (h Handler) Categories(c *gin.Context) {
 		return
 	}
 	x.Name = strings.TrimSpace(x.Name)
+	exists, err := h.categoryNameExists(id, x.Name, x.Type, 0)
+	if err != nil {
+		log.Printf("check category name failed: %v", err)
+		c.JSON(500, gin.H{"error": "failed to validate category"})
+		return
+	}
+	if exists {
+		c.JSON(409, gin.H{"error": "category already exists"})
+		return
+	}
 	x.UserID = id
 	if x.Color == "" {
 		x.Color = "#6366F1"
@@ -347,8 +370,9 @@ func (h Handler) Categories(c *gin.Context) {
 	if x.Icon == "" {
 		x.Icon = "circle"
 	}
-	if e := h.DB.Create(&x).Error; e != nil {
-		c.JSON(409, gin.H{"error": "category already exists"})
+	if err := h.DB.Create(&x).Error; err != nil {
+		log.Printf("create category failed: %v", err)
+		c.JSON(500, gin.H{"error": "failed to create category"})
 		return
 	}
 	c.JSON(201, x)
@@ -374,13 +398,24 @@ func (h Handler) Category(c *gin.Context) {
 		return
 	}
 	z.Name = strings.TrimSpace(x.Name)
+	exists, err := h.categoryNameExists(z.UserID, z.Name, x.Type, z.ID)
+	if err != nil {
+		log.Printf("check category name failed: %v", err)
+		c.JSON(500, gin.H{"error": "failed to validate category"})
+		return
+	}
+	if exists {
+		c.JSON(409, gin.H{"error": "category already exists"})
+		return
+	}
 	z.Type = x.Type
 	z.Color = x.Color
 	if x.Icon != "" {
 		z.Icon = x.Icon
 	}
-	if e := h.DB.Save(&z).Error; e != nil {
-		c.JSON(409, gin.H{"error": "category already exists"})
+	if err := h.DB.Save(&z).Error; err != nil {
+		log.Printf("update category failed: %v", err)
+		c.JSON(500, gin.H{"error": "failed to update category"})
 		return
 	}
 	c.JSON(200, z)

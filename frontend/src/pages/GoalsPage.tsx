@@ -55,10 +55,17 @@ const COLORS = [
 
 export default function GoalsPage() {
   const { user } = useAuth();
-  const { data: goals, loading, error, reload } = useFinance<SavingsGoal[]>("/goals");
+  const {
+    data: goals,
+    loading,
+    error,
+    reload,
+  } = useFinance<SavingsGoal[]>("/goals");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SavingsGoal | null>(null);
-  const [contributeGoal, setContributeGoal] = useState<SavingsGoal | null>(null);
+  const [contributeGoal, setContributeGoal] = useState<SavingsGoal | null>(
+    null,
+  );
   const [contribAmount, setContribAmount] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -204,7 +211,14 @@ export default function GoalsPage() {
         >
           {goals.map((g) => {
             const IconComponent = ICONS[g.icon] || Target;
-            const pct = Math.min(100, Math.round(Number(g.completionPct || (g.currentAmount / g.targetAmount) * 100)));
+            const pct = Math.min(
+              100,
+              Math.round(
+                Number(
+                  g.completionPct || (g.currentAmount / g.targetAmount) * 100,
+                ),
+              ),
+            );
             const isCompleted = g.status === "completed" || pct >= 100;
 
             return (
@@ -227,7 +241,9 @@ export default function GoalsPage() {
                       marginBottom: 16,
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 12 }}
+                    >
                       <div
                         style={{
                           width: 44,
@@ -242,11 +258,17 @@ export default function GoalsPage() {
                         <IconComponent size={22} />
                       </div>
                       <div>
-                        <h2 style={{ fontSize: 16, fontWeight: 600 }}>{g.title}</h2>
+                        <h2 style={{ fontSize: 16, fontWeight: 600 }}>
+                          {g.title}
+                        </h2>
                         {g.deadline && (
                           <small
                             className="subtle"
-                            style={{ display: "flex", alignItems: "center", gap: 4 }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
                           >
                             <Calendar size={12} /> Target: {g.deadline}
                           </small>
@@ -258,13 +280,18 @@ export default function GoalsPage() {
                       style={{
                         background: isCompleted ? "#08795518" : "var(--hover)",
                         color: isCompleted ? "var(--income)" : "var(--text)",
-                        borderColor: isCompleted ? "var(--income)" : "var(--border)",
+                        borderColor: isCompleted
+                          ? "var(--income)"
+                          : "var(--border)",
                         fontWeight: 600,
                       }}
                     >
                       {isCompleted ? (
                         <>
-                          <CheckCircle2 size={11} style={{ display: "inline", marginRight: 3 }} />
+                          <CheckCircle2
+                            size={11}
+                            style={{ display: "inline", marginRight: 3 }}
+                          />
                           Completed
                         </>
                       ) : (
@@ -375,7 +402,9 @@ export default function GoalsPage() {
             />
           </label>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}
+          >
             <label>
               Target Amount ({user?.currency || "INR"})
               <input
@@ -411,7 +440,14 @@ export default function GoalsPage() {
           </label>
 
           <div>
-            <span style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 8 }}>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                display: "block",
+                marginBottom: 8,
+              }}
+            >
               Choose Icon
             </span>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -440,7 +476,14 @@ export default function GoalsPage() {
           </div>
 
           <div>
-            <span style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 8 }}>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                display: "block",
+                marginBottom: 8,
+              }}
+            >
               Accent Color
             </span>
             <div style={{ display: "flex", gap: 10 }}>
@@ -454,8 +497,14 @@ export default function GoalsPage() {
                     height: 32,
                     borderRadius: "50%",
                     background: c,
-                    border: color === c ? "3px solid var(--text)" : "2px solid transparent",
-                    boxShadow: color === c ? "0 0 0 2px var(--panel), 0 2px 8px #0002" : "none",
+                    border:
+                      color === c
+                        ? "3px solid var(--text)"
+                        : "2px solid transparent",
+                    boxShadow:
+                      color === c
+                        ? "0 0 0 2px var(--panel), 0 2px 8px #0002"
+                        : "none",
                     cursor: "pointer",
                     transition: "transform 0.15s",
                   }}

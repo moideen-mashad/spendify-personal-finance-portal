@@ -46,9 +46,12 @@ const rows = [
 ];
 function Table() {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [view, setView] = useState<"grid" | "table">("table");
   return (
     <TransactionsDataTable
       rows={rows}
+      view={view}
+      onViewChange={setView}
       sorting={sorting}
       setSorting={setSorting}
       page={1}
@@ -61,6 +64,16 @@ function Table() {
   );
 }
 describe("Transaction UI", () => {
+  it("switches to a selectable transaction grid", async () => {
+    const user = userEvent.setup();
+    render(<Table />);
+
+    await user.click(screen.getByRole("button", { name: "Grid view" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    await user.click(screen.getByRole("checkbox", { name: "Select Coffee" }));
+    expect(screen.getByText("1 selected")).toBeTruthy();
+  });
+
   it("cycles date sorting and exposes bulk selection", async () => {
     const u = userEvent.setup();
     const { container } = render(<Table />);

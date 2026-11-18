@@ -157,5 +157,6 @@ npm test
 
 ## Project Documentation
 
+- Free-tier self-hosted deployment guide: [`DEPLOYMENT_FREE.md`](./DEPLOYMENT_FREE.md)
 - Academic Project Report (Markdown): [`MCA_Project_Report_v2.md`](file:///c:/Users/Moideen%20Mashad/My%20media%20files/DEVELOPMENT/MCA-FINAL-YEAR-PROJECT/MCA_Project_Report_v2.md)
 - Academic Project Report (Microsoft Word): [`Personal_Finance_Portal_MCA_Project_Report.docx`](file:///c:/Users/Moideen%20Mashad/My%20media%20files/DEVELOPMENT/MCA-FINAL-YEAR-PROJECT/Personal_Finance_Portal_MCA_Project_Report.docx)

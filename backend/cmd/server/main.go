@@ -1,3 +1,30 @@
 package main
-import("log";"finance-portal/backend/internal/config";"finance-portal/backend/internal/database";"finance-portal/backend/internal/handlers";"finance-portal/backend/internal/routes";"github.com/gin-gonic/gin";"github.com/shopspring/decimal")
-func main(){decimal.MarshalJSONWithoutQuotes=true;c:=config.Load();if c.Env=="production"&&(c.AccessSecret==""||c.RefreshSecret==""){log.Fatal("JWT secrets are required in production")};db,e:=database.Connect(c);if e!=nil{log.Fatal(e)};if e=database.Migrate(db);e!=nil{log.Fatal(e)};r:=gin.New();r.Use(gin.Logger(),gin.Recovery());routes.Register(r,handlers.Handler{DB:db,Access:c.AccessSecret,RefreshSecret:c.RefreshSecret,Env:c.Env},c.CORSOrigin);log.Fatal(r.Run(":"+c.Port))}
+
+import (
+	"finance-portal/backend/internal/config"
+	"finance-portal/backend/internal/database"
+	"finance-portal/backend/internal/handlers"
+	"finance-portal/backend/internal/routes"
+	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
+	"log"
+)
+
+func main() {
+	decimal.MarshalJSONWithoutQuotes = true
+	c := config.Load()
+	if c.Env == "production" && (c.AccessSecret == "" || c.RefreshSecret == "") {
+		log.Fatal("JWT secrets are required in production")
+	}
+	db, e := database.Connect(c)
+	if e != nil {
+		log.Fatal(e)
+	}
+	if e = database.Migrate(db); e != nil {
+		log.Fatal(e)
+	}
+	r := gin.New()
+	r.Use(gin.Logger(), gin.Recovery())
+	routes.Register(r, handlers.Handler{DB: db, Access: c.AccessSecret, RefreshSecret: c.RefreshSecret, Env: c.Env}, c.CORSOrigin)
+	log.Fatal(r.Run(":" + c.Port))
+}

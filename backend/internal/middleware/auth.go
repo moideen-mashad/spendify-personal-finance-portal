@@ -1,4 +1,40 @@
 package middleware
-import("net/http";"strings";"github.com/gin-gonic/gin";"github.com/golang-jwt/jwt/v5")
-func Auth(secret string) gin.HandlerFunc{return func(c *gin.Context){v:=strings.TrimPrefix(c.GetHeader("Authorization"),"Bearer ");t,e:=jwt.Parse(v,func(t *jwt.Token)(interface{},error){return []byte(secret),nil});if e!=nil||!t.Valid{c.JSON(http.StatusUnauthorized,gin.H{"error":"unauthorized"});c.Abort();return};claims,ok:=t.Claims.(jwt.MapClaims);if !ok{c.AbortWithStatusJSON(401,gin.H{"error":"unauthorized"});return};sub,ok:=claims["sub"].(string);if !ok{c.AbortWithStatusJSON(401,gin.H{"error":"unauthorized"});return};c.Set("userID",sub);c.Next()}}
-func Security() gin.HandlerFunc{return func(c *gin.Context){c.Header("X-Content-Type-Options","nosniff");c.Header("X-Frame-Options","DENY");c.Header("Referrer-Policy","strict-origin-when-cross-origin");c.Next()}}
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"net/http"
+	"strings"
+)
+
+func Auth(secret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		v := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+		t, e := jwt.Parse(v, func(t *jwt.Token) (interface{}, error) { return []byte(secret), nil })
+		if e != nil || !t.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.Abort()
+			return
+		}
+		claims, ok := t.Claims.(jwt.MapClaims)
+		if !ok {
+			c.AbortWithStatusJSON(401, gin.H{"error": "unauthorized"})
+			return
+		}
+		sub, ok := claims["sub"].(string)
+		if !ok {
+			c.AbortWithStatusJSON(401, gin.H{"error": "unauthorized"})
+			return
+		}
+		c.Set("userID", sub)
+		c.Next()
+	}
+}
+func Security() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Next()
+	}
+}

@@ -21,7 +21,11 @@ func Migrate(db *gorm.DB) error {
 		&models.Category{},
 		&models.Transaction{},
 		&models.Budget{},
+		&models.Account{},
 		&models.RecurringTransaction{},
+		&models.SavingsGoal{},
+		&models.ImportLog{},
+		&models.AuditLog{},
 	); err != nil {
 		return err
 	}

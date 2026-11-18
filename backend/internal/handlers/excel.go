@@ -360,8 +360,8 @@ func (h Handler) ExportTransactions(c *gin.Context) {
 
 	// Styles
 	headerStyle, _ := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{Bold: true, Color: "#FFFFFF", Size: 11},
-		Fill: excelize.Fill{Type: "pattern", Color: []string{"#303C4A"}, Pattern: 1},
+		Font:      &excelize.Font{Bold: true, Color: "#FFFFFF", Size: 11},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"#303C4A"}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"},
 	})
 	incomeStyle, _ := f.NewStyle(&excelize.Style{

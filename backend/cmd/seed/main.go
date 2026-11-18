@@ -1,3 +1,69 @@
 package main
-import("log";"time";"finance-portal/backend/internal/config";"finance-portal/backend/internal/database";"finance-portal/backend/internal/models";"github.com/shopspring/decimal";"golang.org/x/crypto/bcrypt")
-func main(){c:=config.Load();db,e:=database.Connect(c);if e!=nil{log.Fatal(e)};if e=database.Migrate(db);e!=nil{log.Fatal(e)};var u models.User;if db.Where("email=?","demo@example.com").First(&u).Error!=nil{h,_:=bcrypt.GenerateFromPassword([]byte("Demo@1234"),12);u=models.User{FullName:"Demo User",Email:"demo@example.com",PasswordHash:string(h),Currency:"INR"};db.Create(&u);cats:=[]models.Category{};for _,x:=range []struct{n,t,col string}{{"Salary","income","#22c55e"},{"Freelance","income","#10b981"},{"Food & Dining","expense","#ef4444"},{"Transport","expense","#f97316"},{"Rent / Housing","expense","#8b5cf6"},{"Utilities","expense","#06b6d4"},{"Shopping","expense","#ec4899"},{"Entertainment","expense","#f59e0b"},{"Health","expense","#14b8a6"}}{cats=append(cats,models.Category{UserID:u.ID,Name:x.n,Type:x.t,Color:x.col})};db.Create(&cats)};var count int64;db.Model(&models.Transaction{}).Where("user_id=?",u.ID).Count(&count);if count>0{log.Println("demo data already exists");return};var cs []models.Category;db.Where("user_id=?",u.ID).Find(&cs);find:=func(n string)uint64{for _,x:=range cs{if x.Name==n{return x.ID}};return 0};now:=time.Now();for m:=0;m<3;m++{d:=time.Date(now.Year(),now.Month()-time.Month(m),5,0,0,0,0,time.Local);items:=[]struct{n string;a int;day int}{{"Salary",65000,1},{"Freelance",8000+m*1500,14},{"Rent / Housing",18000,2},{"Food & Dining",3500+m*500,4},{"Food & Dining",2800,17},{"Transport",1800,8},{"Transport",1200,21},{"Utilities",2400,10},{"Shopping",3000+m*800,13},{"Entertainment",1800,20},{"Health",1200,25}};for _,x:=range items{date:=time.Date(d.Year(),d.Month(),x.day,0,0,0,0,time.Local);db.Create(&models.Transaction{UserID:u.ID,CategoryID:find(x.n),Amount:decimal.NewFromInt(int64(x.a)),Description:x.n+" payment",TxnDate:date})}};for _,x:=range []struct{n string;a int}{{"Food & Dining",7000},{"Transport",2500},{"Rent / Housing",18000},{"Utilities",4000},{"Shopping",2500}}{db.Create(&models.Budget{UserID:u.ID,CategoryID:find(x.n),Month:int(now.Month()),Year:now.Year(),AmountLimit:decimal.NewFromInt(int64(x.a))})};log.Println("seeded demo@example.com / Demo@1234")}
+
+import (
+	"finance-portal/backend/internal/config"
+	"finance-portal/backend/internal/database"
+	"finance-portal/backend/internal/models"
+	"github.com/shopspring/decimal"
+	"golang.org/x/crypto/bcrypt"
+	"log"
+	"time"
+)
+
+func main() {
+	c := config.Load()
+	db, e := database.Connect(c)
+	if e != nil {
+		log.Fatal(e)
+	}
+	if e = database.Migrate(db); e != nil {
+		log.Fatal(e)
+	}
+	var u models.User
+	if db.Where("email=?", "demo@example.com").First(&u).Error != nil {
+		h, _ := bcrypt.GenerateFromPassword([]byte("Demo@1234"), 12)
+		u = models.User{FullName: "Demo User", Email: "demo@example.com", PasswordHash: string(h), Currency: "INR"}
+		db.Create(&u)
+		cats := []models.Category{}
+		for _, x := range []struct{ n, t, col string }{{"Salary", "income", "#22c55e"}, {"Freelance", "income", "#10b981"}, {"Food & Dining", "expense", "#ef4444"}, {"Transport", "expense", "#f97316"}, {"Rent / Housing", "expense", "#8b5cf6"}, {"Utilities", "expense", "#06b6d4"}, {"Shopping", "expense", "#ec4899"}, {"Entertainment", "expense", "#f59e0b"}, {"Health", "expense", "#14b8a6"}} {
+			cats = append(cats, models.Category{UserID: u.ID, Name: x.n, Type: x.t, Color: x.col})
+		}
+		db.Create(&cats)
+	}
+	var count int64
+	db.Model(&models.Transaction{}).Where("user_id=?", u.ID).Count(&count)
+	if count > 0 {
+		log.Println("demo data already exists")
+		return
+	}
+	var cs []models.Category
+	db.Where("user_id=?", u.ID).Find(&cs)
+	find := func(n string) uint64 {
+		for _, x := range cs {
+			if x.Name == n {
+				return x.ID
+			}
+		}
+		return 0
+	}
+	now := time.Now()
+	for m := 0; m < 3; m++ {
+		d := time.Date(now.Year(), now.Month()-time.Month(m), 5, 0, 0, 0, 0, time.Local)
+		items := []struct {
+			n   string
+			a   int
+			day int
+		}{{"Salary", 65000, 1}, {"Freelance", 8000 + m*1500, 14}, {"Rent / Housing", 18000, 2}, {"Food & Dining", 3500 + m*500, 4}, {"Food & Dining", 2800, 17}, {"Transport", 1800, 8}, {"Transport", 1200, 21}, {"Utilities", 2400, 10}, {"Shopping", 3000 + m*800, 13}, {"Entertainment", 1800, 20}, {"Health", 1200, 25}}
+		for _, x := range items {
+			date := time.Date(d.Year(), d.Month(), x.day, 0, 0, 0, 0, time.Local)
+			db.Create(&models.Transaction{UserID: u.ID, CategoryID: find(x.n), Amount: decimal.NewFromInt(int64(x.a)), Description: x.n + " payment", TxnDate: date})
+		}
+	}
+	for _, x := range []struct {
+		n string
+		a int
+	}{{"Food & Dining", 7000}, {"Transport", 2500}, {"Rent / Housing", 18000}, {"Utilities", 4000}, {"Shopping", 2500}} {
+		db.Create(&models.Budget{UserID: u.ID, CategoryID: find(x.n), Month: int(now.Month()), Year: now.Year(), AmountLimit: decimal.NewFromInt(int64(x.a))})
+	}
+	log.Println("seeded demo@example.com / Demo@1234")
+}

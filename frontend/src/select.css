@@ -1,0 +1,192 @@
+/* Shared Radix select, styled with the same tokens as the Spendify app shell. */
+.select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  box-shadow: 0 1px 2px #18213204;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    background 0.15s;
+}
+.select-trigger > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.select-trigger:hover:not(:disabled) {
+  background: var(--panel);
+  border-color: var(--muted);
+}
+.select-trigger:focus-visible,
+.select-trigger[data-state="open"] {
+  outline: none;
+  border-color: #7893af;
+  box-shadow: 0 0 0 3px #7893af24;
+}
+.select-trigger[data-placeholder] {
+  color: var(--muted);
+}
+.select-trigger[aria-invalid="true"] {
+  border-color: var(--expense);
+}
+.select-trigger:disabled {
+  background: var(--hover);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.select-chevron {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+.select-trigger[data-state="open"] .select-chevron {
+  transform: rotate(180deg);
+}
+.select-content {
+  z-index: 100;
+  min-width: var(--radix-select-trigger-width);
+  max-width: calc(100vw - 24px);
+  max-height: min(320px, var(--radix-select-content-available-height));
+  overflow: hidden;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow:
+    0 12px 36px #10182824,
+    0 2px 6px #1018280a;
+  transform-origin: var(--radix-select-content-transform-origin);
+  animation: select-appear 0.12s ease-out;
+}
+.select-viewport {
+  padding: 5px;
+}
+.select-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 37px;
+  padding: 9px 34px 9px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+.select-item[data-highlighted] {
+  background: var(--hover);
+  color: var(--text);
+  outline: none;
+}
+.select-item[data-state="checked"] {
+  background: var(--hover);
+  font-weight: 600;
+}
+.select-item[data-disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.select-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+}
+.select-description {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.select-dot {
+  height: 8px;
+  width: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px var(--hover);
+}
+.select-check {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  color: var(--text);
+}
+.select-scroll {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 25px;
+  background: var(--panel);
+  color: var(--muted);
+}
+.select-empty {
+  padding: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+label > .select-trigger {
+  margin-top: 7px;
+}
+.select-trigger.select-compact {
+  width: 72px;
+  min-height: 32px;
+  padding: 5px 9px;
+  font-size: 11px;
+  margin-top: 0;
+  font-variant-numeric: tabular-nums;
+}
+.select-trigger.global-range {
+  width: 132px;
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+.select-content .select-item:focus-visible {
+  outline: none;
+}
+@keyframes select-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (max-width: 767px) {
+  .select-trigger.desktop-only {
+    display: none;
+  }
+  .select-item {
+    min-height: 44px;
+  }
+  .select-trigger {
+    min-height: 44px;
+    font-size: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .select-content {
+    animation: none;
+  }
+  .select-trigger,
+  .select-chevron {
+    transition: none;
+  }
+}

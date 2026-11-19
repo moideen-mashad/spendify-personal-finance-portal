@@ -11,12 +11,17 @@ import (
 )
 
 func Register(r *gin.Engine, h handlers.Handler, origin string) {
-	r.Use(middleware.Security(), cors.New(cors.Config{
-		AllowOrigins:     []string{origin},
+	corsCfg := cors.Config{
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Authorization", "Content-Type"},
 		AllowCredentials: true,
-	}))
+	}
+	if origin == "" || origin == "*" {
+		corsCfg.AllowOriginFunc = func(o string) bool { return true }
+	} else {
+		corsCfg.AllowOrigins = []string{origin}
+	}
+	r.Use(middleware.Security(), cors.New(corsCfg))
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})

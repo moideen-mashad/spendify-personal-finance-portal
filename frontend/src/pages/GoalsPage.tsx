@@ -26,6 +26,7 @@ import { useAuth } from "../context/AuthContext";
 import { useFinance } from "../hooks/useFinance";
 import type { SavingsGoal } from "../types";
 import { Dialog } from "../components/ui/dialog";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { EmptyState, ErrorState, Skeleton } from "../components/Feedback";
 import { money } from "../utils/format";
 
@@ -68,6 +69,8 @@ export default function GoalsPage() {
   );
   const [contribAmount, setContribAmount] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deletingGoal, setDeletingGoal] = useState<SavingsGoal | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -160,14 +163,18 @@ export default function GoalsPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this goal?")) return;
+  const handleDelete = async () => {
+    if (!deletingGoal) return;
+    setDeleteBusy(true);
     try {
-      await api.delete(`/goals/${id}`);
+      await api.delete(`/goals/${deletingGoal.id}`);
       toast.success("Goal removed");
+      setDeletingGoal(null);
       reload();
     } catch {
       toast.error("Failed to delete goal");
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -360,7 +367,7 @@ export default function GoalsPage() {
                     <button
                       type="button"
                       className="icon-button"
-                      onClick={() => handleDelete(g.id)}
+                      onClick={() => setDeletingGoal(g)}
                       title="Delete Goal"
                     >
                       <Trash2 size={15} />
@@ -563,6 +570,21 @@ export default function GoalsPage() {
           </div>
         </form>
       </Dialog>
+      <ConfirmDialog
+        open={!!deletingGoal}
+        onOpenChange={(value) => {
+          if (!value && !deleteBusy) setDeletingGoal(null);
+        }}
+        title="Delete savings goal?"
+        description={
+          deletingGoal
+            ? `Are you sure you want to delete "${deletingGoal.title}"? Your accumulated progress tracking will be removed.`
+            : ""
+        }
+        confirmLabel="Delete goal"
+        loading={deleteBusy}
+        onConfirm={handleDelete}
+      />
     </>
   );
 }

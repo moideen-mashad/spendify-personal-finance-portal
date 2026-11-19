@@ -22,6 +22,7 @@ import { useFinance } from "../hooks/useFinance";
 import { usePersistentView } from "../hooks/usePersistentView";
 import type { RecurringTransaction, Category } from "../types";
 import { Dialog } from "../components/ui/dialog";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Select } from "../components/ui/select";
 import { EmptyState, ErrorState, Skeleton } from "../components/Feedback";
 import { money, date } from "../utils/format";
@@ -51,6 +52,8 @@ export default function RecurringPage() {
   const [busy, setBusy] = useState(false);
   const [runningId, setRunningId] = useState<number | null>(null);
   const [view, setView] = usePersistentView("spendify:view:recurring", "table");
+  const [deletingItem, setDeletingItem] = useState<RecurringTransaction | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   // Form
   const [title, setTitle] = useState("");
@@ -118,14 +121,18 @@ export default function RecurringPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Delete this recurring schedule?")) return;
+  const handleDelete = async () => {
+    if (!deletingItem) return;
+    setDeleteBusy(true);
     try {
-      await api.delete(`/recurring/${id}`);
+      await api.delete(`/recurring/${deletingItem.id}`);
       toast.success("Recurring schedule removed");
+      setDeletingItem(null);
       reload();
     } catch {
       toast.error("Could not delete schedule");
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -399,7 +406,7 @@ export default function RecurringPage() {
                           <button
                             type="button"
                             className="icon-button"
-                            onClick={() => handleDelete(it.id)}
+                            onClick={() => setDeletingItem(it)}
                             title="Delete"
                             aria-label={`Delete ${it.title}`}
                           >
@@ -489,7 +496,7 @@ export default function RecurringPage() {
                     <button
                       type="button"
                       className="icon-button"
-                      onClick={() => handleDelete(it.id)}
+                      onClick={() => setDeletingItem(it)}
                       title="Delete"
                       aria-label={`Delete ${it.title}`}
                     >
@@ -613,6 +620,21 @@ export default function RecurringPage() {
           </div>
         </form>
       </Dialog>
+      <ConfirmDialog
+        open={!!deletingItem}
+        onOpenChange={(value) => {
+          if (!value && !deleteBusy) setDeletingItem(null);
+        }}
+        title="Delete recurring schedule?"
+        description={
+          deletingItem
+            ? `Delete scheduled transaction "${deletingItem.title}"? Automated runs will no longer generate future transactions.`
+            : ""
+        }
+        confirmLabel="Delete schedule"
+        loading={deleteBusy}
+        onConfirm={handleDelete}
+      />
     </>
   );
 }

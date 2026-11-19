@@ -262,31 +262,29 @@ func (h Handler) Me(c *gin.Context) {
 			c.JSON(400, gin.H{"error": "invalid request"})
 			return
 		}
-		if x.FullName != "" {
-			u.FullName = x.FullName
+		if strings.TrimSpace(x.FullName) != "" {
+			u.FullName = strings.TrimSpace(x.FullName)
 		}
 		if len(x.Currency) == 3 {
 			u.Currency = strings.ToUpper(x.Currency)
 		}
-		if x.Phone != "" {
-			u.Phone = x.Phone
-		}
-		if x.Bio != "" {
-			u.Bio = x.Bio
-		}
+		u.Phone = strings.TrimSpace(x.Phone)
+		u.Bio = strings.TrimSpace(x.Bio)
 		if x.AvatarURL != "" {
 			u.AvatarURL = x.AvatarURL
 		}
-		if !x.MonthlyIncomeGoal.IsZero() {
-			u.MonthlyIncomeGoal = x.MonthlyIncomeGoal
-		}
-		if x.FiscalStartDay != nil {
+		u.MonthlyIncomeGoal = x.MonthlyIncomeGoal
+		if x.FiscalStartDay != nil && *x.FiscalStartDay >= 1 && *x.FiscalStartDay <= 28 {
 			u.FiscalStartDay = *x.FiscalStartDay
 		}
-		if x.AlertThresholdPct != nil {
+		if x.AlertThresholdPct != nil && *x.AlertThresholdPct >= 1 && *x.AlertThresholdPct <= 100 {
 			u.AlertThresholdPct = *x.AlertThresholdPct
 		}
-		h.DB.Save(&u)
+		if err := h.DB.Save(&u).Error; err != nil {
+			log.Printf("Save user failed: %v", err)
+			c.JSON(500, gin.H{"error": "failed to save profile"})
+			return
+		}
 		h.AuditLog(u.ID, models.AuditProfileUpdate, c, nil)
 	}
 	c.JSON(200, gin.H{

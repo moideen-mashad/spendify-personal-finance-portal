@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MonthPicker } from "../components/ui/date-picker";
 import { Link } from "react-router-dom";
 import {
@@ -25,7 +25,7 @@ import { useFinance } from "../hooks/useFinance";
 import { usePersistentView } from "../hooks/usePersistentView";
 import { useAuth } from "../context/AuthContext";
 import type { BudgetActual } from "../types/finance";
-import type { Category, AuditLog } from "../types";
+import type { Category, AuditLog, User as UserModel } from "../types";
 import { BudgetProgress } from "../components/dashboard/BudgetProgress";
 import { Dialog } from "../components/ui/dialog";
 import { EmptyState, ErrorState, Skeleton } from "../components/Feedback";
@@ -394,7 +394,7 @@ function getPasswordStrength(pw: string): {
 }
 
 export function SettingsPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const [tab, setTab] = useState<"profile" | "financial" | "security">(
     "profile",
   );
@@ -402,6 +402,32 @@ export function SettingsPage() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarLoading, setAvatarLoading] = useState(false);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Avatar image must be under 2MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      setAvatarLoading(true);
+      try {
+        const res = await api.put<UserModel>("/users/me", { avatarUrl: dataUrl });
+        updateUser(res.data);
+        toast.success("Avatar photo updated!");
+      } catch {
+        toast.error("Failed to update avatar");
+      } finally {
+        setAvatarLoading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // ── Profile form ──
   const profileForm = useForm<z.infer<typeof profileSchema>>({
@@ -515,7 +541,8 @@ export function SettingsPage() {
             style={{ display: "flex", flexDirection: "column", gap: 20 }}
             onSubmit={profileForm.handleSubmit(async (values) => {
               try {
-                await api.put("/users/me", values);
+                const res = await api.put<UserModel>("/users/me", values);
+                updateUser(res.data);
                 toast.success("Profile saved");
               } catch {
                 toast.error("Could not save profile");
@@ -531,7 +558,15 @@ export function SettingsPage() {
                 padding: "8px 0",
               }}
             >
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/png,image/jpeg,image/webp"
+                style={{ display: "none" }}
+                onChange={handleAvatarChange}
+              />
               <div
+                onClick={() => fileInputRef.current?.click()}
                 style={{
                   width: 64,
                   height: 64,
@@ -546,8 +581,9 @@ export function SettingsPage() {
                   overflow: "hidden",
                   cursor: "pointer",
                   position: "relative",
+                  opacity: avatarLoading ? 0.6 : 1,
                 }}
-                title="Change avatar"
+                title="Click to change avatar photo"
               >
                 {user?.avatarUrl ? (
                   <img
@@ -564,11 +600,12 @@ export function SettingsPage() {
                 )}
               </div>
               <div>
-                <b style={{ fontSize: 13 }}>{user?.fullName}</b>
+                <b style={{ fontSize: 14 }}>{user?.fullName}</b>
                 <p
-                  style={{ color: "var(--muted)", fontSize: 11, marginTop: 4 }}
+                  style={{ color: "var(--muted)", fontSize: 11, marginTop: 4, cursor: "pointer" }}
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  Click the avatar to update your photo
+                  {avatarLoading ? "Uploading photo…" : "Click the avatar to update your photo"}
                 </p>
               </div>
             </div>
@@ -671,7 +708,8 @@ export function SettingsPage() {
             style={{ display: "flex", flexDirection: "column", gap: 20 }}
             onSubmit={financialForm.handleSubmit(async (values) => {
               try {
-                await api.put("/users/me", values);
+                const res = await api.put<UserModel>("/users/me", values);
+                updateUser(res.data);
                 toast.success("Financial settings saved");
               } catch {
                 toast.error("Could not save settings");

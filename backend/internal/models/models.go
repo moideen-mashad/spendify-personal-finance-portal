@@ -25,7 +25,7 @@ type User struct {
 	PasswordHash      string          `json:"-"                 gorm:"type:varchar(255)"`
 	Currency          string          `json:"currency"          gorm:"type:char(3);default:'INR'"`
 	Phone             string          `json:"phone,omitempty"   gorm:"type:varchar(20)"`
-	AvatarURL         string          `json:"avatarUrl,omitempty" gorm:"type:varchar(500)"`
+	AvatarURL         string          `json:"avatarUrl,omitempty" gorm:"type:mediumtext"`
 	Bio               string          `json:"bio,omitempty"     gorm:"type:varchar(500)"`
 	MonthlyIncomeGoal decimal.Decimal `json:"monthlyIncomeGoal" gorm:"type:decimal(14,2)"`
 	FiscalStartDay    int             `json:"fiscalStartDay"    gorm:"default:1"`

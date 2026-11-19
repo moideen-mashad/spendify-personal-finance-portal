@@ -91,7 +91,17 @@ export default function AppShell() {
             {!collapsed && "Settings"}
           </NavLink>
           <div className="user-block">
-            <span className="avatar">{user?.fullName.slice(0, 1) || "Y"}</span>
+            <span className="avatar" style={{ overflow: "hidden", display: "grid", placeItems: "center" }}>
+              {user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.fullName}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                />
+              ) : (
+                user?.fullName.slice(0, 1) || "Y"
+              )}
+            </span>
             {!collapsed && (
               <div>
                 <b>{user?.fullName}</b>

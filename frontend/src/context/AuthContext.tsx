@@ -12,6 +12,7 @@ type C = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (updated: Partial<User>) => void;
 };
 const Auth = createContext<C | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -69,8 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
   };
+  const updateUser = (updated: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...updated } : (updated as User)));
+  };
   return (
-    <Auth.Provider value={{ user, loading, login, logout }}>
+    <Auth.Provider value={{ user, loading, login, logout, updateUser }}>
       {children}
     </Auth.Provider>
   );

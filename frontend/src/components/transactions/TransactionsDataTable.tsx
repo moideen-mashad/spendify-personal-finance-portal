@@ -503,9 +503,13 @@ export function TransactionsDataTable({
         </>
       ) : (
         <EmptyState
-          title="No matching transactions"
-          description="Try a different search or give your filters a fresh start."
-          action="Clear filters"
+          title={q ? "No matching transactions" : "No transactions recorded yet"}
+          description={
+            q
+              ? "Try a different search or give your filters a fresh start."
+              : "Record your first transaction using the 'Add transaction' button or import via Excel."
+          }
+          action={q ? "Clear filters" : undefined}
           onAction={onClear}
         />
       )}{" "}

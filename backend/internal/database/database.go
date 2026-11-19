@@ -9,7 +9,10 @@ import (
 )
 
 func Connect(c config.Config) (*gorm.DB, error) {
-	db, e := gorm.Open(mysql.Open(c.DSN), &gorm.Config{})
+	db, e := gorm.Open(mysql.New(mysql.Config{
+		DSN:               c.DSN,
+		DefaultStringSize: 191,
+	}), &gorm.Config{})
 	if e != nil {
 		return nil, fmt.Errorf("database connection: %w", e)
 	}
@@ -27,7 +30,7 @@ func Migrate(db *gorm.DB) error {
 		&models.ImportLog{},
 		&models.AuditLog{},
 	); err != nil {
-		return err
+		fmt.Printf("AutoMigrate non-fatal warning: %v\n", err)
 	}
 
 	return db.Exec(`

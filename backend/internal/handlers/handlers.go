@@ -344,6 +344,19 @@ func (h Handler) Categories(c *gin.Context) {
 			c.JSON(500, gin.H{"error": "failed to load categories"})
 			return
 		}
+		// If user has no categories, auto-seed default categories so dropdowns are never empty
+		if len(z) == 0 {
+			var totalCount int64
+			h.DB.Model(&models.Category{}).Where("user_id = ?", id).Count(&totalCount)
+			if totalCount == 0 {
+				defaults(h.DB, id)
+				q2 := h.DB.Where("user_id = ?", id)
+				if t := c.Query("type"); t != "" {
+					q2 = q2.Where("type = ?", t)
+				}
+				_ = q2.Order("name").Find(&z).Error
+			}
+		}
 		c.JSON(200, z)
 		return
 	}

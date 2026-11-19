@@ -62,13 +62,13 @@ export function TransactionDrawer({
               txnDate: transaction.txnDate,
             }
           : {
-              categoryId: 0,
-              amount: 0,
+              categoryId: categories && categories.length > 0 ? categories[0].id : 0,
+              amount: "" as unknown as number,
               description: "",
               txnDate: format(new Date(), "yyyy-MM-dd"),
             },
       );
-  }, [open, transaction, reset]);
+  }, [open, transaction, categories, reset]);
   return (
     <Dialog
       open={open}
@@ -168,6 +168,11 @@ export function TransactionDrawer({
             {errors.categoryId && (
               <span id="transaction-category-error" className="field-error">
                 {errors.categoryId.message}
+              </span>
+            )}
+            {!categoriesLoading && categories && categories.length === 0 && (
+              <span className="subtle" style={{ display: "block", marginTop: 4 }}>
+                No categories found. Initializing default categories…
               </span>
             )}
           </label>

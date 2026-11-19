@@ -1,73 +1,217 @@
-# Free-Tier Deployment Guide
+# Free-Tier Deployment Guide: Vercel, Render & Cloud Options
 
-This guide deploys Spendify on one Oracle Cloud Infrastructure (OCI) Always Free Ubuntu VM. The VM runs MySQL 8, the Go API, and Nginx; Nginx serves the built React app and proxies API requests on the same HTTPS origin.
+This guide provides two complete, battle-tested options for deploying the Personal Finance Portal (**Folio / Spendify**) on free-tier infrastructure.
 
-This avoids a paid managed database and cross-site refresh-cookie issues. OCI free capacity and terms can change, so this is not a guarantee of permanent zero cost or uptime.
+- **Option 1 (Recommended): Cloud Native Stack**
+  - **Frontend:** [Vercel](https://vercel.com) (Edge CDN, Automated Git Deployments, Free SSL)
+  - **Backend API:** [Render](https://render.com) or [Koyeb](https://koyeb.com) (Free Go Container/Native Web Service)
+  - **Database:** [TiDB Cloud](https://tidbcloud.com) or [Aiven](https://aiven.io) (Free 5GB–25GB MySQL 8-compatible Serverless database, no credit card required)
+- **Option 2: Single-VM Self-Hosted Stack**
+  - Oracle Cloud Infrastructure (OCI) Always Free Ubuntu VM running MySQL 8, Go API, and Nginx reverse proxy.
 
-## What you need
+---
 
-- An OCI account and an Always Free-eligible Ubuntu VM. OCI currently documents up to 2 OCPUs and 12 GB of memory for Ampere A1 Always Free compute.
-- A Git clone URL for this project.
-- A DNS name pointing to the VM's public IP. A free dynamic-DNS subdomain such as [DuckDNS](https://www.duckdns.org/) can work; a registered domain may cost money.
-- SSH access to the VM.
-- Go at the version declared in `backend/go.mod` (currently Go 1.26.0), Node.js 20 or later, and Docker Engine.
+# OPTION 1: Vercel + Render + TiDB Cloud (Recommended)
 
-Read OCI's [Always Free resource limits](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) before provisioning. In the console, check that each resource is marked **Always Free-eligible** and verify the cost estimate is $0, including any public IP or storage choices. Do not create paid resources or upgrade the account for this guide. Sign-up may require a payment card for identity verification. Capacity can be unavailable, and OCI may reclaim idle compute instances.
+This setup requires **no credit card**, takes less than 10 minutes, and automatically deploys on every `git push`.
 
-## 1. Provision and secure the VM
-
-Create an Ubuntu ARM64 VM using the Always Free-eligible `VM.Standard.A1.Flex` shape. Keep the CPU, memory, and boot volume within the current Always Free allowance. Save the private SSH key securely.
-
-In the VM's network security rules:
-
-- Allow SSH (port 22) only from your own IP address.
-- Allow HTTP (port 80) and HTTPS (port 443) for web traffic.
-- Do **not** open MySQL (3306) or the API port (8080) to the internet.
-
-Connect using the SSH key and default Ubuntu account:
-
-```bash
-ssh -i /path/to/private-key ubuntu@YOUR_VM_PUBLIC_IP
+```
++-------------------------------------------------------------+
+|                       END USER BROWSER                      |
++-------------------------------------------------------------+
+                               |
+                               | HTTPS Requests
+                               v
++-------------------------------------------------------------+
+|                      VERCEL (FRONTEND)                      |
+|       - React 18 + Vite SPA on Global Edge Network          |
+|       - vercel.json handles client-side routing & rewrites  |
++-------------------------------------------------------------+
+                               |
+                               | /api/* requests (proxied or direct)
+                               v
++-------------------------------------------------------------+
+|                    RENDER (GO BACKEND API)                  |
+|       - Go 1.22+ Gin Framework HTTP Server                 |
+|       - Auto-runs migrations on startup                     |
++-------------------------------------------------------------+
+                               |
+                               | TLS TCP Connection (Port 4000/3306)
+                               v
++-------------------------------------------------------------+
+|                 TIDB CLOUD (MYSQL 8 DATABASE)               |
+|       - 100% Free Serverless MySQL-compatible cluster       |
+|       - Persistent storage (up to 5GB free forever)         |
++-------------------------------------------------------------+
 ```
 
-Install the base tools:
+---
 
-```bash
-sudo apt update
-sudo apt install -y git nginx certbot python3-certbot-nginx ca-certificates curl rsync
+## Step 1: Create a Free MySQL Database (2 Minutes)
+
+Because Vercel is a serverless platform, you need a cloud-hosted MySQL database. **TiDB Cloud Serverless** provides a 100% free MySQL-compatible instance without requiring a credit card:
+
+1. Sign up for free at [tidbcloud.com](https://tidbcloud.com) (or [aiven.io](https://aiven.io)).
+2. Click **Create Cluster** → choose **Serverless (Free)**.
+3. Select any region (e.g., `AWS / us-east-1` or region closest to you).
+4. Click **Create**. Your cluster is provisioned in ~15 seconds.
+5. In the cluster dashboard, click **Connect** → choose **Connect with General Client** (or Golang):
+   - Note down: `Host`, `Port` (typically `4000`), `User`, `Password`, and `Database` name (e.g., `test` or `finance_portal`).
+6. Your connection string (`DB_DSN`) format will look like:
+   ```dotenv
+   DB_DSN=your_user.root:your_password@tcp(gateway01.us-east-1.prod.aws.tidbcloud.com:4000)/finance_portal?tls=true&charset=utf8mb4&parseTime=True&loc=Local
+   ```
+
+---
+
+## Step 2: Deploy the Go API on Render (Free Tier)
+
+Render hosts backend services for free with automatic SSL.
+
+1. Push your project to a GitHub repository:
+   ```bash
+   git add .
+   git commit -m "feat: ready for cloud deployment"
+   git push origin main
+   ```
+2. Log in to [render.com](https://render.com) using your GitHub account.
+3. In the Render Dashboard, click **New +** → **Web Service**.
+4. Select your GitHub repository.
+5. Fill in the service configuration:
+   - **Name:** `spendify-backend-api`
+   - **Region:** Same region as your database (e.g. `Ohio (US East)`)
+   - **Branch:** `main`
+   - **Root Directory:** `backend`
+   - **Runtime:** `Go` (or choose `Docker` to use `backend/Dockerfile`)
+   - **Build Command:** `go build -o server ./cmd/server`
+   - **Start Command:** `./server`
+   - **Instance Type:** `Free`
+6. Add the **Environment Variables** in the Render console:
+   | Key | Value | Notes |
+   |---|---|---|
+   | `PORT` | `8080` | Render defaults to port 8080 or 10000 |
+   | `ENV` | `production` | Enables secure cookie mode |
+   | `DB_DSN` | *(Your TiDB Cloud connection string from Step 1)* | Must include `?tls=true&parseTime=True` |
+   | `JWT_ACCESS_SECRET` | *(64-character random string)* | E.g. generate via `openssl rand -hex 32` |
+   | `JWT_REFRESH_SECRET` | *(Different 64-character random string)* | E.g. generate via `openssl rand -hex 32` |
+   | `CORS_ORIGIN` | `https://YOUR-APP.vercel.app` | Can temporarily use `*` until Vercel URL is ready |
+7. Click **Create Web Service**.
+8. Once built and running, Render will assign your backend a public URL:
+   `https://spendify-backend-api.onrender.com`
+9. Test the health endpoint in your browser:
+   `https://spendify-backend-api.onrender.com/health` → `{"status":"ok"}`.
+
+---
+
+## Step 3: Deploy the React Frontend on Vercel
+
+### Method A: Connect Git Repository to Vercel (Recommended)
+
+1. Log in to [vercel.com](https://vercel.com) with GitHub.
+2. Click **Add New...** → **Project**.
+3. Import your GitHub repository.
+4. In the **Configure Project** screen:
+   - **Project Name:** `spendify-portal`
+   - **Framework Preset:** `Vite`
+   - **Root Directory:** Click **Edit** → select `frontend` (or leave as root; both `frontend/vercel.json` and `./vercel.json` are pre-configured).
+   - **Build and Output Settings:**
+     - Build Command: `npm run build`
+     - Output Directory: `dist`
+     - Install Command: `npm install`
+5. Expand **Environment Variables** and add:
+   | Key | Value | Description |
+   |---|---|---|
+   | `VITE_API_URL` | `https://spendify-backend-api.onrender.com/api/v1` | Your live Render backend API URL |
+6. Click **Deploy**.
+7. Vercel builds and deploys your application in ~30 seconds and outputs your live URL:
+   `https://spendify-portal.vercel.app`.
+
+---
+
+## Step 4: Finalize CORS & Cookie Alignment
+
+To ensure cross-origin authentication and refresh tokens function smoothly between Vercel and Render:
+
+1. Return to your **Render Dashboard** → `spendify-backend-api` → **Environment**.
+2. Update `CORS_ORIGIN` to match your exact Vercel URL:
+   ```dotenv
+   CORS_ORIGIN=https://spendify-portal.vercel.app
+   ```
+   *(Ensure there is no trailing slash).*
+3. Save changes. Render will automatically redeploy the backend with the new allowed origin.
+
+### Optional: Vercel Reverse Proxy Rewrites (Zero-CORS Same-Origin Mode)
+If you prefer the frontend and backend to appear on the *exact same domain*, you can use Vercel's Edge Rewrites. In `frontend/vercel.json`:
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/api/:match*",
+      "destination": "https://spendify-backend-api.onrender.com/api/:match*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://spendify-backend-api.onrender.com/health"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
 ```
+When this rewrite is active:
+- Leave `VITE_API_URL` unset (or `/api/v1`).
+- The browser sends all API calls to `https://spendify-portal.vercel.app/api/v1/...`.
+- Vercel forwards requests securely to Render.
+- HttpOnly refresh cookies work transparently without cross-site cookie restrictions!
 
-Install Docker Engine using Docker's [official Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/). Install Go and Node.js using their official instructions, then confirm the versions:
+---
 
-```bash
-go version
-node --version
-npm --version
-docker --version
-```
+## Step 5: Post-Deployment Verification
 
-## 2. Start a private MySQL 8 database
+1. **Verify SPA Routing:** Open your Vercel deployment URL (`https://spendify-portal.vercel.app/`). Navigate to `/transactions`, `/budgets`, `/goals`, and `/profile`. Refresh the browser on any sub-page to confirm that Vercel's rewrite rule prevents 404 errors.
+2. **Register a User:** Click Register, fill in your details, and create an account. Check that you are automatically redirected to the dashboard.
+3. **Verify Features:**
+   - Test adding a transaction.
+   - Click **Excel / CSV Engine** → download the sample template (`.xlsx`).
+   - Test category management and savings goal creation.
+   - Go to **Settings** → test updating profile data and password change.
 
-Create a root-only directory and a secrets file:
+---
+
+# OPTION 2: Single-VM Self-Hosted Stack (OCI Always Free)
+
+This guide deploys the entire application on one Oracle Cloud Infrastructure (OCI) Always Free Ubuntu VM. The VM runs MySQL 8 in Docker, the Go API via systemd, and Nginx to serve the built React app and reverse-proxy API requests on the same HTTPS origin.
+
+## 1. Provision and Secure the VM
+
+1. In the OCI Console, create an Always Free Ubuntu ARM64 instance (`VM.Standard.A1.Flex`).
+2. Allow ports `22` (SSH), `80` (HTTP), and `443` (HTTPS) in the VM security list.
+3. Connect via SSH:
+   ```bash
+   ssh -i /path/to/private-key ubuntu@YOUR_VM_PUBLIC_IP
+   ```
+4. Install base packages:
+   ```bash
+   sudo apt update && sudo apt install -y git nginx certbot python3-certbot-nginx ca-certificates curl rsync
+   ```
+
+## 2. Start MySQL 8 Database Container
 
 ```bash
 sudo install -d -m 700 /etc/spendify
-sudoedit /etc/spendify/mysql.env
-```
-
-Add these values, replacing both passwords with different long random hexadecimal values. You can generate one with `openssl rand -hex 32`:
-
-```dotenv
+sudo tee /etc/spendify/mysql.env > /dev/null <<'EOF'
 MYSQL_DATABASE=finance_portal
 MYSQL_USER=finance_user
-MYSQL_PASSWORD=REPLACE_WITH_RANDOM_HEX_PASSWORD
-MYSQL_ROOT_PASSWORD=REPLACE_WITH_A_DIFFERENT_RANDOM_HEX_PASSWORD
-```
+MYSQL_PASSWORD=replace_with_strong_password
+MYSQL_ROOT_PASSWORD=replace_with_strong_root_password
+EOF
 
-Save the file, then restrict its permissions and start MySQL. The published port is bound to loopback only, and the named Docker volume keeps database files across container restarts:
-
-```bash
 sudo chmod 600 /etc/spendify/mysql.env
+
 sudo docker run -d \
   --name spendify-mysql \
   --restart unless-stopped \
@@ -77,56 +221,31 @@ sudo docker run -d \
   mysql:8.0
 ```
 
-Wait for MySQL to become ready:
-
-```bash
-until sudo docker exec spendify-mysql mysqladmin ping -h 127.0.0.1 --silent; do sleep 2; done
-```
-
-## 3. Clone the project and configure the API
-
-Clone your repository (replace the example URL with your own):
+## 3. Build & Run the Go API
 
 ```bash
 git clone https://github.com/OWNER/REPOSITORY.git "$HOME/spendify"
-```
 
-Create the API environment file outside the repository:
-
-```bash
-sudoedit /etc/spendify/backend.env
-```
-
-Set the MySQL password to the same hexadecimal value used in `mysql.env`. Generate two **different** JWT secrets with `openssl rand -hex 32`. Replace the example hostname with the DNS name configured for this VM:
-
-```dotenv
+sudo tee /etc/spendify/backend.env > /dev/null <<'EOF'
 PORT=8080
 ENV=production
-DB_DSN=finance_user:REPLACE_WITH_MYSQL_PASSWORD@tcp(127.0.0.1:3306)/finance_portal?charset=utf8mb4&parseTime=True&loc=Local
-JWT_ACCESS_SECRET=REPLACE_WITH_FIRST_RANDOM_SECRET
-JWT_REFRESH_SECRET=REPLACE_WITH_DIFFERENT_RANDOM_SECRET
-CORS_ORIGIN=https://spendify.example.duckdns.org
-```
+DB_DSN=finance_user:replace_with_strong_password@tcp(127.0.0.1:3306)/finance_portal?charset=utf8mb4&parseTime=True&loc=Local
+JWT_ACCESS_SECRET=replace_with_random_secret_1
+JWT_REFRESH_SECRET=replace_with_random_secret_2
+CORS_ORIGIN=https://spendify.yourdomain.com
+EOF
 
-Protect the file and build the API:
-
-```bash
 sudo chmod 600 /etc/spendify/backend.env
+
 cd "$HOME/spendify/backend"
-go mod download
 go build -o "$HOME/spendify-api" ./cmd/server
 ```
 
-The API automatically creates and migrates its database tables when it starts.
-
-Create a systemd service so the API restarts after a reboot:
-
-```bash
-sudo tee /etc/systemd/system/spendify-api.service >/dev/null <<'SERVICE'
+Create the systemd service `/etc/systemd/system/spendify-api.service`:
+```ini
 [Unit]
-Description=Spendify API
-After=network-online.target docker.service
-Wants=network-online.target
+Description=Spendify Backend API
+After=network-online.target
 
 [Service]
 Type=simple
@@ -139,39 +258,31 @@ RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-SERVICE
-
+```
+Start the service:
+```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now spendify-api
-sudo systemctl status spendify-api
 ```
 
-If you use a Linux account other than `ubuntu`, update `User`, `WorkingDirectory`, and `ExecStart` in the service file to match it.
-
-## 4. Build the frontend
-
-The frontend's default API URL is the relative path `/api/v1`. Keep it relative so browser requests go through Nginx to the API on the same origin.
+## 4. Build Frontend & Configure Nginx
 
 ```bash
 cd "$HOME/spendify/frontend"
 npm install
-VITE_API_URL=/api/v1 npm run build
+npm run build
 sudo install -d -o ubuntu -g ubuntu /var/www/spendify
 sudo rsync -a --delete dist/ /var/www/spendify/
 ```
 
-## 5. Configure Nginx and HTTPS
-
-Create an Nginx site. Replace `spendify.example.duckdns.org` with your actual DNS name:
-
-```bash
-sudo tee /etc/nginx/sites-available/spendify >/dev/null <<'NGINX'
+Configure Nginx `/etc/nginx/sites-available/spendify`:
+```nginx
 server {
     listen 80;
-    server_name spendify.example.duckdns.org;
+    server_name spendify.yourdomain.com;
     root /var/www/spendify;
     index index.html;
-    client_max_body_size 10m;
+    client_max_body_size 15m;
 
     location /api/ {
         proxy_pass http://127.0.0.1:8080;
@@ -183,73 +294,29 @@ server {
 
     location = /health {
         proxy_pass http://127.0.0.1:8080/health;
-        proxy_set_header Host $host;
     }
 
     location / {
         try_files $uri $uri/ /index.html;
     }
 }
-NGINX
-
-sudo ln -s /etc/nginx/sites-available/spendify /etc/nginx/sites-enabled/spendify
-sudo nginx -t
-sudo systemctl reload nginx
 ```
 
-Make sure your DNS name resolves to the VM and port 80 is reachable, then request a free TLS certificate:
-
-Create an `A` record for your hostname that points to the VM's public IPv4 address. Wait for DNS to resolve before requesting the certificate.
-
+Enable site and acquire SSL:
 ```bash
-sudo certbot --nginx -d spendify.example.duckdns.org
+sudo ln -s /etc/nginx/sites-available/spendify /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d spendify.yourdomain.com
 ```
 
-Choose the option to redirect HTTP to HTTPS. `ENV=production` makes the refresh cookie secure, so use the HTTPS URL when testing. The frontend and API share the same origin; keep `CORS_ORIGIN` set to that exact origin, including `https://` and without a trailing slash.
+---
 
-## 6. Verify the deployment
+## Common Deployment Troubleshooting
 
-Check the API and Nginx:
-
-```bash
-curl -fsS https://spendify.example.duckdns.org/health
-sudo systemctl status spendify-api
-sudo journalctl -u spendify-api -n 100 --no-pager
-sudo tail -n 100 /var/log/nginx/error.log
-```
-
-Open the HTTPS site, register a new account, and test login and refresh. Do not run the demo seeder on a public deployment unless you change or remove its documented demo credentials.
-
-## Updates and backups
-
-Before updating, take a database backup and copy it off the VM. For example:
-
-```bash
-sudo docker exec spendify-mysql sh -c \
-  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -uroot "$MYSQL_DATABASE"' \
-  > "$HOME/spendify-backup-$(date +%F).sql"
-```
-
-Then update and rebuild:
-
-```bash
-cd "$HOME/spendify"
-git pull
-cd frontend
-npm install
-VITE_API_URL=/api/v1 npm run build
-sudo rsync -a --delete dist/ /var/www/spendify/
-cd ../backend
-go mod download
-go build -o "$HOME/spendify-api" ./cmd/server
-sudo systemctl restart spendify-api
-```
-
-Download backups to another device; a backup stored only on the VM will not protect against VM or account loss.
-
-## Security and free-tier limitations
-
-- This is an academic project, not a hardened financial service. The current API does not rate-limit login attempts. Do not store bank credentials, payment-card details, or sensitive real financial records in a public demo.
-- Keep both secrets files outside Git, never expose ports 3306 or 8080 publicly, use HTTPS, and restrict SSH access.
-- Free-tier capacity, usage terms, and provider pricing can change. Free resources may be reclaimed or unavailable, and there is no production uptime guarantee. Keep external backups and check the provider's cost estimate and current terms regularly.
-- A temporary [Cloudflare Quick Tunnel](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) can provide a URL for a short demonstration without a domain, but its hostname changes and Cloudflare documents it for testing, not production.
+| Issue | Cause | Solution |
+|---|---|---|
+| **Vercel 404 on page refresh** | Single Page Application (SPA) routing requires index fallback | Ensure `vercel.json` contains `"source": "/(.*)", "destination": "/index.html"` |
+| **CORS Blocked in Browser** | Backend `CORS_ORIGIN` does not match Vercel URL | Update `CORS_ORIGIN` on Render to your exact Vercel URL (e.g. `https://your-app.vercel.app`) |
+| **HttpOnly cookie not saved** | Browser blocking cross-domain cookies | Use the Vercel Reverse Proxy configuration in `vercel.json` so API calls stay on the same origin |
+| **Render spin-down cold start** | Free-tier Render web services sleep after 15 min of inactivity | Normal behavior on free tier (~30-50s wake up time); upgrade to Starter or use a free cron pinger like UptimeRobot to ping `/health` |
+| **MySQL connection refused** | Missing TLS parameter or incorrect host | For TiDB Cloud, ensure connection string includes `?tls=true&charset=utf8mb4&parseTime=True` |

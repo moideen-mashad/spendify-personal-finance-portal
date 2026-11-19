@@ -164,14 +164,20 @@ func (h Handler) Login(c *gin.Context) {
 	}
 	a, _ := h.token(u.ID, h.Access, 15*time.Minute)
 	r, _ := h.token(u.ID, h.RefreshSecret, 7*24*time.Hour)
-	c.SetSameSite(http.SameSiteStrictMode)
-	c.SetCookie("refresh_token", r, 604800, "/api/v1/auth", "", h.Env == "production", true)
+	if h.Env == "production" {
+		c.SetSameSite(http.SameSiteNoneMode)
+		c.SetCookie("refresh_token", r, 604800, "/api/v1/auth", "", true, true)
+	} else {
+		c.SetSameSite(http.SameSiteStrictMode)
+		c.SetCookie("refresh_token", r, 604800, "/api/v1/auth", "", false, true)
+	}
 
 	// Audit login event
 	h.AuditLog(u.ID, models.AuditLogin, c, nil)
 
 	c.JSON(200, gin.H{
-		"accessToken": a,
+		"accessToken":  a,
+		"refreshToken": r,
 		"user": gin.H{
 			"id":       u.ID,
 			"fullName": u.FullName,
@@ -182,7 +188,19 @@ func (h Handler) Login(c *gin.Context) {
 }
 
 func (h Handler) Refresh(c *gin.Context) {
-	r, e := c.Cookie("refresh_token")
+	r, _ := c.Cookie("refresh_token")
+	if r == "" {
+		var req struct {
+			RefreshToken string `json:"refreshToken"`
+		}
+		_ = c.ShouldBindJSON(&req)
+		r = req.RefreshToken
+	}
+	if r == "" {
+		if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+			r = strings.TrimPrefix(auth, "Bearer ")
+		}
+	}
 	t, e := jwt.Parse(r, func(t *jwt.Token) (interface{}, error) {
 		return []byte(h.RefreshSecret), nil
 	})
@@ -193,11 +211,28 @@ func (h Handler) Refresh(c *gin.Context) {
 	s := t.Claims.(jwt.MapClaims)["sub"].(string)
 	id, _ := strconv.ParseUint(s, 10, 64)
 	a, _ := h.token(id, h.Access, 15*time.Minute)
-	c.JSON(200, gin.H{"accessToken": a})
+	newR, _ := h.token(id, h.RefreshSecret, 7*24*time.Hour)
+	if h.Env == "production" {
+		c.SetSameSite(http.SameSiteNoneMode)
+		c.SetCookie("refresh_token", newR, 604800, "/api/v1/auth", "", true, true)
+	} else {
+		c.SetSameSite(http.SameSiteStrictMode)
+		c.SetCookie("refresh_token", newR, 604800, "/api/v1/auth", "", false, true)
+	}
+	c.JSON(200, gin.H{
+		"accessToken":  a,
+		"refreshToken": newR,
+	})
 }
 
 func (h Handler) Logout(c *gin.Context) {
-	c.SetCookie("refresh_token", "", -1, "/api/v1/auth", "", h.Env == "production", true)
+	if h.Env == "production" {
+		c.SetSameSite(http.SameSiteNoneMode)
+		c.SetCookie("refresh_token", "", -1, "/api/v1/auth", "", true, true)
+	} else {
+		c.SetSameSite(http.SameSiteStrictMode)
+		c.SetCookie("refresh_token", "", -1, "/api/v1/auth", "", false, true)
+	}
 	c.Status(204)
 }
 
